@@ -1,0 +1,13 @@
+Revision history for Perl extension LJ::Simple.
+
+0.03  Monday Aug 19 16:44 2002
+	- Ability to delete entry added
+	- First public release
+
+0.02  Tues Jul 20 15:58:00 2002
+	- Major functionality added
+
+0.01  Mon Jul 22 17:19:26 2002
+	- original version; created by h2xs 1.21 with options
+		-X -n LJ::Simple
+
