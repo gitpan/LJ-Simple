@@ -9,7 +9,7 @@ require AutoLoader;
 @ISA = qw(Exporter AutoLoader);
 @EXPORT_OK = qw();
 @EXPORT = qw();
-$VERSION = '0.09';
+$VERSION = '0.10';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -43,6 +43,9 @@ LJ::Simple - Simple Perl to access LiveJournal
 
   # Do we show the LJ protocol ?
   $LJ::Simple::protocol = 0;
+
+  # Do we show a raw protocol ?
+  $LJ::Simple::raw_protocol = 0;
 
   # Do we use version 1 of the LJ protocol and thus support UTF-8 ?
   $LJ::Simple::UTF = undef;
@@ -215,6 +218,17 @@ If set to C<1>, debugging messages are sent to stderr.
 
 If set to C<1> the protocol used to talk to the remote server is sent to stderr.
 
+=item $LJ::Simple::raw_protocol
+
+If set to C<1> the raw protocol used to talk to the remote server is sent to stderr;
+this is only useful if you are doing debugging on C<LJ::Simple> itself as the protocol
+is shown as the module gets it from the server; non-printable characters are converted
+to their octal presentation form, I<ie> a newline becomes C<\012>.
+
+It should be noted that if C<$LJ::Simple::raw_protocol> is set along with
+C<$LJ::Simple::protocol> then the raw protocol display takes precedence for data
+returning from the LJ server.
+
 =item $LJ::Simple::UTF
 
 If set to C<1> the LiveJournal server is told to expect UTF-8 encoded characters.
@@ -261,6 +275,8 @@ The number of bytes to try and read in on each C<sysread()> call.
 $LJ::Simple::debug=0;
 # Show protocol ?
 $LJ::Simple::protocol=0;
+# Show raw protocol ?
+$LJ::Simple::raw_protocol=0;
 # Use UTF-8 ?
 $LJ::Simple::UTF = undef;
 # Use challenge-response ?
@@ -1427,7 +1443,7 @@ Example code:
   printf($format,"Sort","Id","Public","Group");
   print $line;
   
-  foreach (sort {$fg{$a}->{sort}<=>$gfg_hr{$b}->{sort}} keys %gfg_hr) {
+  foreach (sort {$fg{$a}->{sort}<=>$fg{$b}->{sort}} keys %fg) {
     my $hr=$fg{$_};
     my $pub="No";
     $hr->{public} && ($pub="Yes");
@@ -3587,7 +3603,7 @@ sub SendRequest($$$$) {
 
   my $ip_addr=join(".",unpack("CCCC",$addr));
 
-  if ($LJ::Simple::protocol) {
+  if (($LJ::Simple::protocol)||($LJ::Simple::raw_protocol)) {
     print STDERR "Connecting to $server [$ip_addr]\n";
     print STDERR "Lines starting with \"-->\" is data SENT to the server\n";
     print STDERR "Lines starting with \"<--\" is data RECEIVED from the server\n";
@@ -3599,7 +3615,7 @@ sub SendRequest($$$$) {
     return 0;
   }
 
-  ($LJ::Simple::protocol) &&
+  (($LJ::Simple::protocol)||($LJ::Simple::raw_protocol)) &&
      print STDERR "Connected to $server [$ip_addr]\n";
 
   # Send the HTTP request
@@ -3629,7 +3645,7 @@ sub SendRequest($$$$) {
       }
       $pos+=$nbytes;
     }
-    ($LJ::Simple::protocol) &&
+    (($LJ::Simple::protocol)||($LJ::Simple::raw_protocol)) &&
       print STDERR "--> $_\n";
   }
 
@@ -3657,9 +3673,17 @@ sub SendRequest($$$$) {
     } elsif ($nbytes==0) {
       $done=1;
     } else {
+      $resp=~s/\r//go;
       $response=join("",$response,$resp);
-      if ($LJ::Simple::protocol) {
-        foreach (split(/[\r\n]{1,2}/,$resp)) {
+      if ($LJ::Simple::raw_protocol) {
+        print STDERR "<-- ";
+        foreach (split(//,$resp)) {
+          s/([\x00-\x20\x7f-\xff])/sprintf("\\%o",ord($1))/ei;
+          print "$_";
+        }
+        print STDERR "\n";
+      } elsif ($LJ::Simple::protocol) {
+        foreach (split(/\n/,$resp)) {
           print STDERR "<-- $_\n";
         }
       }
@@ -3686,9 +3710,6 @@ sub SendRequest($$$$) {
     $LJ::Simple::error="Zero length response from server";
     return 0;
   }
-
-  # First remove all \r's
-  $response=~s/\r//go;
 
   # Split into headers and body
   my ($http,$body)=split(/\n\n/,$response,2);
@@ -3719,9 +3740,10 @@ sub SendRequest($$$$) {
   $self->{request}->{lj}={};
 
   # The response from LJ takes the form of a key\nvalue\n
+  # Note that the value can be null tho
   $done=0;
   while (!$done) {
-    if ($body=~/^([^\n]+)\n([^\n]+)\n(.*)$/so) {
+    if ($body=~/^([^\n]+)\n([^\n]*)\n(.*)$/so) {
       my ($k,$v)=(undef,undef);
       ($k,$v,$body)=(lc($1),DecVal($2),$3);
       $v=~s/\r\n/\n/go;

@@ -1,5 +1,14 @@
 Revision history for Perl extension LJ::Simple.
 
+0.10  Saturday March 20 21:28:29 GMT 2004
+	- Added the examples directory in the distribution
+	- Fixed a bug in how the SendRequest() routine parsed the
+		results from the LiveJournal server.
+	- Removed the test.pl script from the distribution as LiveJournal
+		have removed the test user it depended on
+	- Updated the ljpost example with the ability to post restricted posts
+	- Corrected the example code for GetFriendGroups() shown on the manual page
+
 0.09  Friday January  7 11:09:49 GMT 2004
 	- UTF support is now automatically detected
 	- Added support for the getchallenge method to support the new
