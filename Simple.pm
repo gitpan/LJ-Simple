@@ -9,7 +9,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 our @EXPORT = qw();
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -69,6 +69,7 @@ LJ::Simple - Simple Perl to access LiveJournal
   $lj->message()
   $lj->moods($hash_ref)
   $lj->communities()
+  $lj->MemberOf($community)
   $lj->groups($hash_ref)
   $lj->MapGroupToId($group_name)
   $lj->MapIdToGroup($id)
@@ -76,20 +77,24 @@ LJ::Simple - Simple Perl to access LiveJournal
   $lj->user()
   $lj->fastserver()
 
-  ## Routines for posting journal entries
+  ## Routines which pull data from the LJ server
+  $lj->GetFriendOf()
+
+  ## Routines for handling journal entries
   # Top level journal access routines
   $lj->UseJournal($event,$journal)
   $lj->NewEntry($event)
   $lj->PostEntry($event)
   $lj->DeleteEntry($item_id)
+  $lj->SyncItems($time_t)
 
   # Routines which do more than just set a value within
   # a new journal entry
-  $lj->SetSubject($event,$subject)
   $lj->SetDate($event,$time_t)
   $lj->SetMood($event,$mood)
 
   # Routines for setting subject and journal contents
+  $lj->SetSubject($event,$subject)
   $lj->SetEntry($event,@entry)
   $lj->AddToEntry($event,@entry)
 
@@ -124,6 +129,11 @@ Log into the LiveJournal system
 =item Post
 
 Post a new journal entry in the LiveJournal system
+
+=item Synchronise
+
+Returns a list of journal entries created or modified from a given
+date.
 
 =item Delete
 
@@ -546,6 +556,29 @@ sub communities($) {
 
 =pod
 
+=item $lj->MemberOf($community)
+
+Returns C<1> if the user is a member of the named community. Returns
+C<0> otherwise.
+
+Example code:
+
+  if ($lj->MemberOf("some_community")) {
+     :
+     :
+     :
+  }
+
+=cut
+sub MemberOf($$) {
+  my $self=shift;
+  my ($community)=@_;
+  $LJ::Simple::error="";
+  return (exists $self->{access}->{$community});
+}
+
+=pod
+
 =item $lj->groups($hash_ref)
 
 Takes a reference to a hash and fills it with information about
@@ -754,6 +787,85 @@ sub fastserver($) {
   return $self->{fastserver};
 }
 
+=pod
+
+=item $lj->GetFriendOf()
+
+Returns a list of the other LiveJournal users who list the current
+user as a friend. The list returned contains a least one entry, the
+number of entries in the list. This value can range from 0 to however
+many users are in the list. In the event of a failure this value is
+undefined.
+
+The list of friends is a list of hash references which contain data
+about the users who list the current user as a friend. Each hash
+referenced will contain the following:
+
+  {
+    user     => The LiveJournal username
+    name     => The full name of the user
+    fg       => The foreground colour which represents the user
+    bg       => The background colour which represents the user
+    status   => The status of the user
+    type     => The type of the user
+  }
+
+Both the C<bg> and C<fg> values are stored in the format of "C<#>I<RR>I<GG>I<BB>"
+where the I<RR>, I<GG>, I<BB> values are given as two digit hexadecimal numbers which
+range from C<00> to C<ff>.
+
+The C<status> of a user can be one of "C<active>", "C<deleted>", "C<suspended>" or "C<purged>".
+
+The C<type> of a user can either be "C<user>" which means that the user is a normal
+LiveJournal user or it can be "C<community>" which means that the user is actually a
+community which the current LJ user is a member of.
+
+It should be noted that any of the values in the hash above can be undefined if
+that value was not returned from the LiveJournal server.
+
+Example code:
+
+  my ($num_friends_of,@FriendOf)=$lj->GetFriendOf();
+  (defined $num_friends_of) ||
+    die "$0: Failed to get friends of user - $LJ::Simple::error\n";
+  print "LJ login\tReal name\tfg\tbg\tStatus\tType\n";
+  foreach (@FriendOf) {
+    print "$_->{user}\t",
+          "$_->{name}\t",
+          "$_->{fg}\t",
+          "$_->{bg}\t",
+          "$_->{status}\t",
+          "$_->{type}\n";
+  }
+
+=cut
+sub GetFriendOf($) {
+  my $self=shift;
+  $LJ::Simple::error="";
+  my %Event=();
+  my %Resp=();
+  $self->SendRequest("friendof",\%Event,\%Resp) || return undef;
+  my %Friends=();
+  my ($k,$v);
+  while(($k,$v)=each %Resp) {
+    ($k=~/^friendof_([0-9]+)_(.*)/) || next;
+    my ($id,$type)=($1,$2);
+    if (!exists $Friends{$id}) {
+      $Friends{$id}={
+	user	=>	undef,
+	name	=>	undef,
+	bg	=>	undef,
+	fg	=>	undef,
+	status	=>	"active",
+	type	=>	"user",
+      };
+    }
+    $Friends{$id}->{$type}=$v;
+  }
+  my @lst=(values %Friends);
+  return ($#lst+1,@lst);
+}
+
 
 =pod
 
@@ -890,7 +1002,7 @@ sub SetMood($$$) {
       return $self->Setprop_current_mood_id($event,$self->{mood_map}->{$lc_mood})
     }
   }
-  return $self->Setprop_current_mood($mood);
+  return $self->Setprop_current_mood($event,$mood);
 }
 
 
@@ -1231,7 +1343,7 @@ Example code:
 sub Setprop_backdate($$$) {
   my ($self,$event,$onoff)=@_;
   $LJ::Simple::error="";
-  return $self->Setprop_general($event,"opt_backdate","Setprop_backdate","bool",$onoff);
+  return $self->Setprop_general($event,"opt_backdated","Setprop_backdate","bool",$onoff);
 }
 
 
@@ -1537,6 +1649,182 @@ sub DeleteEntry($$) {
   return $self->SendRequest("editevent",\%Event,undef);
 }
 
+=pod
+
+=item $lj->SyncItems($timestamp)
+
+This routine returns a list of all of the items (journal entries, to-do items,
+comments) which have been created or updated on LiveJournal. There is an optional
+timestamp value for specifying the time you last synchronised with the server.
+This timestamp value can either be a Unix-style C<time_t> value or a previously
+returned timestamp from this routine. If not used specify the undefined value
+C<undef>.
+
+When specifying the time you must take into account the fact that the modification
+or creation times of the entries in the LiveJournal database are stored as the
+time local to the computer running the database rather than GMT. Due to this
+it is safest to use the time from the latest item downloaded from the LiveJournal
+from a previous C<SyncItems()> call.
+
+On success this routine will return a list which contains first the number of
+valid items in the list and then a list of hashes which contain the details
+of the items found. This routine can return an empty list which signifies that
+no new items could be found. On failure C<undef> is returned.
+
+The format of the returned list is as follows. The list of hashes is ordered
+by the timestamps of the entries, oldest to newest.
+
+  @list = (
+    number of items returned,
+    {
+      item_id   => Item_id of the entry changed
+      type      => Type of entry
+      action    => What happened to the entry
+      time_t    => Time of change in Unix time (see note below)
+      timestamp => Timestamp from server
+    },
+  );
+
+The C<type> of entry can be one of the following letters:
+
+  C<L>: Journal entries
+  C<C>: Comments
+  C<T>: To-do items
+
+It should be noted that currently the LiveJournal system will only ever
+return "C<L>" types due to the C<C> and C<T> types not having been implemented
+in the LiveJournal code yet.
+
+The C<action> of the entry can be either C<create> for a new entry,
+C<update> for an entry which has been modified or C<del> for a deleted entry.
+
+The C<time_t> value is probably going to be wrong; as far as the author of
+this code can tell, you can not get the timezone of the server which is
+serving out the request. This means that converting the timestamps
+returned by the server from their format of C<YYYY-MM-DD hh:mm:ss> into
+a Unix C<time_t> value is inaccurate at best since C<time_t> is defined
+as the number of seconds since 00:00 1st January 1970 B<GMT>. Functions
+like C<mktime()> which can be used to create C<time_t> values have to
+assume that the data they are being given is valid for the timezone the
+machine it is running on is actually in. Given the nature of the net
+this is rarely the case. I<sigh> I wish that the LJ developers had stored
+timestamps in pure C<time_t> in the database... and if they have done they
+should provide a way for developers to get access to this as its B<much>
+more useful IMHO.
+
+Given the above you're probably wondering why I included the C<time_t>
+value. Well, whilst the value isn't much use when it really comes down
+to it, it B<is> useful when it comes to sorting the list of entries as
+all of the entries from the same server will be inaccurate to the same
+amount.
+
+The C<timestamp> from server takes the format of C<YYYY-MM-DD hh:mm:ss>
+
+It should be noted that this routine can take a long time to return
+if there are large numbers of entries to be returned. This is especially
+true if you give C<undef> as the timestamp.
+
+Example code:
+
+  # All entries in the last day or so; this is fudged due to timezone
+  # differences (WTF didn't they store stuff in GMT ?)
+  my ($num_of_items,@lst)=$lj->SyncItems(time() - (86400 * 2));
+  
+  (defined $num_of_items) ||
+    die "$0: Failed to sync - $LJ::Simple::error\n";
+
+  my $hr=undef;
+  print "Number of items: $num_of_items\n";
+  print "Item_id\tType\tAction\tTime_t\t\tTimestamp\n";
+  foreach $hr (@lst) {
+    print "$hr->{item_id}\t" .
+          "$hr->{type}\t" .
+          "$hr->{action}\t" .
+          "$hr->{time_t}\t" .
+          "$hr->{timestamp}\n";
+  }
+
+=cut
+sub SyncItems($$) {
+  my $self=shift;
+  my ($timet)=@_;
+  if ($LJ::Simple::debug) {
+    my $ts=undef;
+    if (defined $timet) {
+      $ts="\"$timet\"";
+    } else {
+      $ts="undef";
+    }
+    Debug "SyncItems($ts)";
+  }
+  my %Event=();
+  my %Resp=();
+  if (defined $timet) {
+    if ($timet=~/^[0-9]+$/) {
+      $Event{lastsync}=strftime("%Y-%m-%d %H:%M:%S",gmtime($timet));
+    } else {
+      $Event{lastsync}=$timet;
+    }
+  }
+  $self->SendRequest("syncitems",\%Event,\%Resp) || return undef;
+  my %Mh=();
+  my $sync_count;
+  my $sync_total;
+  my $latest=0;
+  my $latest_ts;
+  my ($key,$val);
+  while(($key,$val)=each %Resp) {
+    if ($key=~/sync_([0-9]+)_(.*)$/o) {
+      my ($id,$name)=($1,$2);
+      (exists $Mh{$id}) || ($Mh{$id}={});
+      if ($name eq "item") {
+        my ($type,$item_id)=split(/-/,$val,2);
+        $Mh{$id}->{item_id}=$item_id;
+        $Mh{$id}->{type}=$type;
+      } elsif ($name eq "action") {
+        $Mh{$id}->{action}=$val;
+      } elsif ($name eq "time") {
+        $Mh{$id}->{timestamp}=$val;
+        if ($val!~/([0-9]+)-([0-9]+)-([0-9]+)\s([0-9]+):([0-9]+):([0-9]+)/io) {
+          $LJ::Simple::error="INTERNAL: failed to parse timestamp \"$val\"";
+          return undef;
+        }
+        $Mh{$id}->{time_t}=mktime($6,$5,$4,$3,$2-1,$1-1900,0,0,0);
+        if (!defined $Mh{$id}->{time_t}) {
+          $LJ::Simple::error="INTERNAL: failed to create time_t from \"$val\"";
+          return undef;
+        }
+        if ($Mh{$id}->{time_t}>$latest) {
+          $latest_ts=$val;
+          $latest=$Mh{$id}->{time_t};
+        }
+      } else {
+        $LJ::Simple::error="INTERNAL: Unrecognised sync_[0-9]_* \"$key\"";
+        return undef;
+      }
+    } elsif ($key eq "sync_total") {
+      $sync_total=$val;
+    } elsif ($key eq "sync_count") {
+      $sync_count=$val;
+    }
+  }
+  Debug "sync_count=$sync_count\n";
+  Debug "sync_total=$sync_total\n";
+  my @lst=();
+  push(@lst,values %Mh);
+  if ($sync_count != $sync_total) {
+    my ($num,@nl)=$self->SyncItems($latest_ts);
+    (defined $num) || return undef;
+    push(@lst,@nl);
+  }
+  @lst=sort { $a->{time_t} <=> $b->{time_t} } @lst;
+  map { $_->{kv}=join(":",$_->{item_id},$_->{type},$_->{action},$_->{time_t}) } @lst;
+  my %seen=();
+  @lst=grep((!exists $seen{$_->{kv}}) && ($seen{$_->{kv}}=1),@lst);
+  my $tot=$#lst+1;
+  return ($tot,@lst);
+}
+
 ##### Start of helper functions
 
 ##
@@ -1545,10 +1833,10 @@ sub DeleteEntry($$) {
 ##
 sub EncVal($$) {
   my ($key,$val)=@_;
-  $key=~s/\s/\+/go;
+  $key=~s/ /\+/go;
   $key=~s/([^a-z0-9+])/sprintf("%%%x",ord($1))/egsi;
-  $val=~s/\s/\+/go;
-  $val=~s/([^a-z0-9+])/sprintf("%%%x",ord($1))/egsi;
+  $val=~s/ /\+/go;
+  $val=~s/([^a-z0-9+])/sprintf("%%%02x",ord($1))/egsi;
   return "$key=$val";
 }
 
@@ -1605,10 +1893,24 @@ sub SendRequest($$$$) {
       push(@request,EncVal("getpickwurls",1));
     }
   } elsif ( ($mode eq "postevent")
-         || ($mode eq "editevent") ) {
-    my ($k,$v);
-    while(($k,$v)=each %{$args}) {
-      push(@request,EncVal($k,$v));
+         || ($mode eq "editevent") 
+         || ($mode eq "syncitems") 
+         || ($mode eq "getfriends") 
+         || ($mode eq "friendof") 
+          ) {
+    if (defined $args) {
+      my ($k,$v);
+      while(($k,$v)=each %{$args}) {
+        if (!defined $k) {
+          $LJ::Simple::error="CODE: SendRequest() given undefined key value";
+          return 0;
+        }
+        if (!defined $v) {
+          $LJ::Simple::error="CODE: SendRequest() given undefined value for \"$k\"";
+          return 0;
+        }
+        push(@request,EncVal($k,$v));
+      }
     }
   } else {
     $LJ::Simple::error="INTERNAL: SendRequest() given unsupported mode \"$mode\"";

@@ -3,10 +3,12 @@
 
 #########################
 use Test;
-BEGIN { plan tests => 47 };
+BEGIN { plan tests => 49 };
 use LJ::Simple;
 ok(1); # If we made it this far, we're ok.
 #########################
+
+#goto LOGIN;
 
 ## Test object creation via new - should fail
 my $lj = new LJ::Simple();
@@ -60,6 +62,8 @@ if (defined $lj) {
   ok(1);
 }
 
+LOGIN:
+
 ## Test object creation with a valid username and password
 $lj = new LJ::Simple ({
 	user	=>	"test",
@@ -72,6 +76,8 @@ if (defined $lj) {
 } else {
   ok(0);
 }
+
+#goto JTEST;
 
 my $msg=$lj->message();
 ok(1);
@@ -106,7 +112,7 @@ my %Event=();
 ## Ensure that stuff for posting journal entrie doesn't work until
 ## NewEntry is called
 if (!defined $lj->PostEntry(\%Event)) {
-  if ($LJ::Simple::error=~/Failed to post entry/){ok(1);}else{ok(0);}
+  if ($LJ::Simple::error=~/CODE: NewEntry not called/){ok(1);}else{ok(0);}
 } else { ok(0); }
 if (!$lj->SetDate("")) {
   if ($LJ::Simple::error=~/Not given a hash reference/){ok(1);}else{ok(0);}
@@ -124,7 +130,7 @@ if (!$lj->NewEntry(\%Event)) {
 
 ## Post it - we are expecting an error due to no entry being present
 if (!defined $lj->PostEntry(\%Event)) {
- if ($LJ::Simple::error=~/no journal entry/){ok(1);}else{ok(0);}
+ if ($LJ::Simple::error=~/No journal entry set/){ok(1);}else{ok(0);}
 } else {
   ok(0);
 }
@@ -223,11 +229,15 @@ if (!$lj->NewEntry(\%Event)) {
 
 my $entry=<<EOF;
 Test of <tt>LJ::Simple</tt> version $LJ::Simple::VERSION
+Meek
+Moo
+Bar
 EOF
 if (!$lj->SetEntry(\%Event,$entry)) { ok(0) } else { ok(1) }
 
 $lj->SetMood(\%Event,"happy");
 $lj->Setprop_nocomments(\%Event,1);
+$lj->Setprop_backdate(\%Event,1);
 
 ## Finally fully test a post
 my ($item_id,$anum,$html_id)=$lj->PostEntry(\%Event);
@@ -238,7 +248,24 @@ if (!defined $item_id) {
 }
 
 
+my ($num_of_items,@lst)=$lj->SyncItems(time()-86400);
+if ((defined $num_of_items)&&($num_of_items>0)) {
+  my $ok=0;
+  foreach (@lst) {
+    if ($_->{item_id} == $item_id) {
+      $ok=1;
+      last;
+    }
+  }
+  if ($ok) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
 
 ## Be nice and remove the test entry
 if (!$lj->DeleteEntry($item_id)) { ok(0) } else { ok(1) }
 
+my ($num_friends_of,@FriendOf)=$lj->GetFriendOf();
+if (defined $num_friends_of) { ok(1) } else {ok(0)}
+
+JTEST:

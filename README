@@ -1,7 +1,14 @@
-LJ::Simple version 0.02
+LJ::Simple version 0.04
 =======================
 
-LJ::Simple is a simple perl API to LiveJournal.
+LJ::Simple is a simple perl API to LiveJournal. Currently it provides
+the following functionality:
+
+ o Login
+ o Post journal entries
+ o Synchronise journal entries
+ o Delete journal entries
+ o Get a list of users who consider the LJ user logged in as their friend
 
 INSTALLATION
 

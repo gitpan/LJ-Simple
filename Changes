@@ -1,5 +1,13 @@
 Revision history for Perl extension LJ::Simple.
 
+0.04  Sunday September  1 22:11 2002
+	- Added MemberOf() routine
+	- Added the SyncItems() routine
+	- Added the GetFriendOf() routine
+	- Fixed how request to LJ is encoded; \n was being matched by \s
+	- Fixed SetMood() routine
+	- Fixed Setprop_backdate() routine
+
 0.03  Monday Aug 19 16:44 2002
 	- Ability to delete entry added
 	- First public release

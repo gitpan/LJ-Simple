@@ -32,7 +32,7 @@ publish: dist
 ## Unless you've got the pkg-tools package this will break for you
 ## as well
 ##
-pkg:
+pkg: pure_all
 	cat InstallPackage/pkginfo | \\
 		sed 's/^VERSION=.*/VERSION=\$(VERSION)/' \\
 		> tmp.pkginfo
