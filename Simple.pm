@@ -9,7 +9,7 @@ require AutoLoader;
 @ISA = qw(Exporter AutoLoader);
 @EXPORT_OK = qw();
 @EXPORT = qw();
-$VERSION = '0.09';
+$VERSION = '0.08';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict

@@ -1,7 +1,5 @@
 Revision history for Perl extension LJ::Simple.
 
-0.09  UNKNOWN
-
 0.08  Thu Dec 18 11:11:17 GMT 2003
 	- Added a check for zero length responses from the LJ servers
 	- Fix for potential bug relating to unusual responses from LJ
