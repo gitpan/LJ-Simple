@@ -1,5 +1,16 @@
 Revision history for Perl extension LJ::Simple.
 
+0.09  UNKNOWN
+
+0.08  Thu Dec 18 11:11:17 GMT 2003
+	- Added a check for zero length responses from the LJ servers
+	- Fix for potential bug relating to unusual responses from LJ
+	  web servers.
+	- Added an example script which will make all of the entries within
+	  a journal at least friends-only
+	- Fixes to documentation
+	- Added the SetProtectPublic() method as requested by Richard Watts.
+
 0.07  Friday September 12 09:49:40 BST 2003
 	- Minor changes to documentation and example code
 	- Corrected the package building Makefile target

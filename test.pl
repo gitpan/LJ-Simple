@@ -335,6 +335,7 @@ $lj->SetSubject(\%Event,"Test entry");
 $lj->SetMood(\%Event,"happy");
 $lj->Setprop_nocomments(\%Event,1);
 $lj->Setprop_backdate(\%Event,1);
+$lj->SetProtectFriends(\%Event);
 
 ## Finally fully test a post
 my ($item_id,$anum,$html_id)=$lj->PostEntry(\%Event);
@@ -406,14 +407,14 @@ if (defined $prop) {ok(1)} else {ok(0)}
 if (defined $lj->GetEntries(\%GE_hr,undef,"lastn",undef,undef)) {
   if (exists $GE_hr{$item_id}) {ok(1)} else {ok(0)}
 } else {
-  ok(0);
+  ok(0); print "  Error was: $LJ::Simple::error\n";
 }
 
 # lastn, last 20 entries before current time
 if (defined $lj->GetEntries(\%GE_hr,undef,"lastn",undef,time()+800)) {
   if (exists $GE_hr{$item_id}) {ok(1)} else {ok(0)}
 } else {
-  ok(0);
+  ok(0); print "  Error was: $LJ::Simple::error\n";
 }
 
 my %Entry=();
@@ -421,7 +422,7 @@ my %Entry=();
 if (defined $lj->GetEntries(\%Entry,undef,"one",$item_id)) {
   if (exists $Entry{$item_id}) {ok(1)} else {ok(0)}
 } else {
-  ok(0);
+  ok(0); print "  Error was: $LJ::Simple::error\n";
 }
 # sync from yesturday
 if (defined $lj->GetEntries(\%GE_hr,undef,"sync",$^T-86400)) {
@@ -439,7 +440,7 @@ if ($lj->EditEntry($event)) {ok(1)} else {ok(0)}
 if (defined $lj->GetEntries(\%Entry,undef,"one",$item_id)) {
   if (exists $Entry{$item_id}) {ok(1)} else {ok(0)}
 } else {
-  ok(0);
+  ok(0); print STDERR "  Error was: $LJ::Simple::error\n";
 }
 if ($NewText eq $lj->GetEntry($Entry{$item_id})) { ok(1) } else { ok(0) }
 

@@ -9,7 +9,7 @@ require AutoLoader;
 @ISA = qw(Exporter AutoLoader);
 @EXPORT_OK = qw();
 @EXPORT = qw();
-$VERSION = '0.07';
+$VERSION = '0.09';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -119,6 +119,7 @@ LJ::Simple - Simple Perl to access LiveJournal
   $lj->AddToEntry($event,@entry)
 
   # Routines for setting permissions on the entry
+  $lj->SetProtectPublic($event)
   $lj->SetProtectFriends($event)
   $lj->SetProtectGroups($event,$group1, $group2, ... $groupN)
   $lj->SetProtectPrivate($event)
@@ -1011,10 +1012,10 @@ Both the C<bg> and C<fg> values are stored in the format of "C<#>I<RR>I<GG>I<BB>
 where the I<RR>, I<GG>, I<BB> values are given as two digit hexadecimal numbers which
 range from C<00> to C<ff>.
 
-The C<status> of a user can be one of "C<active>", "C<deleted>", "C<suspended>" or "C<purged>".
+The C<status> of a user can be one of C<active>, C<deleted>, C<suspended> or C<purged>.
 
-The C<type> of a user can either be "C<user>" which means that the user is a normal
-LiveJournal user or it can be "C<community>" which means that the user is actually a
+The C<type> of a user can either be C<user> which means that the user is a normal
+LiveJournal user or it can be C<community> which means that the user is actually a
 community which the current LJ user is a member of.
 
 It should be noted that any of the values in the hash above can be undefined if
@@ -1113,10 +1114,10 @@ the C<groups> list. It is a 32-bit number where each bit represents membership o
 given friends group. Bits 0 and 31 are reserved; all other bits can be used. The bit
 a group corresponds to is taken by bit-shifting 1 by the group id number.
 
-The C<status> of a user can be one of "C<active>", "C<deleted>", "C<suspended>" or "C<purged>".
+The C<status> of a user can be one of C<active>, C<deleted>, C<suspended> or C<purged>.
 
-The C<type> of a user can either be "C<user>" which means that the user is a normal
-LiveJournal user or it can be "C<community>" which means that the user is actually a
+The C<type> of a user can either be C<user> which means that the user is a normal
+LiveJournal user or it can be C<community> which means that the user is actually a
 community which the current LJ user is a member of.
 
 It should be noted that any of the values in the hash above can be undefined if
@@ -1488,7 +1489,7 @@ sub NewEntry($$) {
 
 Sets the date for the event being built from the given C<time_t> (i.e. seconds
 since epoch) value. Bare in mind that you may need to call
-C<$lj-<gt>Setprop_backdate(\%Event,1)> to backdate the journal entry if the journal being
+C<$lj-E<gt>Setprop_backdate(\%Event,1)> to backdate the journal entry if the journal being
 posted to has events more recent than the date being set here. Returns C<1> on
 success, C<0> on failure.
 
@@ -1545,7 +1546,7 @@ sub SetDate($$$) {
 =item $lj->SetMood($event,$mood)
 
 Given a mood this routine sets the mood for the journal entry. Unlike the
-more direct C<$lj-<gt>Setprop_current_mood()> and C<$lj-<gt>Setprop_current_mood_id(\%Event,)>
+more direct C<$lj-E<gt>Setprop_current_mood()> and C<$lj-E<gt>Setprop_current_mood_id(\%Event,)>
 routines, this routine will attempt to first attempt to find the mood given
 to it in the mood list returned by the LiveJournal server. If it is unable to
 find a suitable mood then it uses the text given.
@@ -1712,14 +1713,14 @@ sub SetEntry($$@) {
 
 Adds a string to the existing journal entry being worked on. The new data
 will be appended to the existing entry with a newline separating them.
-It should be noted that as with C<$lj-<gt>SetEntry()> the list given to
+It should be noted that as with C<$lj-E<gt>SetEntry()> the list given to
 this routine will be C<join()>ed together with a newline between each 
 list entry.
 
-If C<$lj-<gt>SetEntry()> has not been called then C<$lj-<gt>AddToEntry()> acts
-in the same way as C<$lj-<gt>SetEntry()>.
+If C<$lj-E<gt>SetEntry()> has not been called then C<$lj-E<gt>AddToEntry()> acts
+in the same way as C<$lj-E<gt>SetEntry()>.
 
-If C<$lj-<gt>SetEntry()> has already been called then calling C<$lj-<gt>AddToEntry()>
+If C<$lj-E<gt>SetEntry()> has already been called then calling C<$lj-E<gt>AddToEntry()>
 with a null list or a list which starts with C<undef> is a NOP.
 
 Returns C<1> on success, C<0> otherwise.
@@ -1763,6 +1764,37 @@ sub AddToEntry($$@) {
   return 1;
 }
 
+
+=pod
+
+=item $lj->SetProtectPublic($event)
+
+Sets the current post so that anyone can read the journal entry. Note that this
+is the default for a new post created by C<LJ::Simple> - this method is most
+useful when working with an existing post. Returns C<1> on success, C<0>
+otherwise.
+
+Example code:
+
+  $lj->SetProtectPublic(\%Event)
+    || die "$0: Failed to make entry public - $LJ::Simple::error\n";
+
+=cut
+sub SetProtectPublic($$) {
+  my $self=shift;
+  my ($event)=@_;
+  $LJ::Simple::error="";
+  if (ref($event) ne "HASH") {
+    $LJ::Simple::error="CODE: Not given a hash reference";
+    return 0;
+  }
+  (exists $event->{security}) && delete $event->{security};
+  (exists $event->{allowmask}) && delete $event->{allowmask};
+  return 1;
+}
+
+
+=pod
 
 
 =pod
@@ -1934,7 +1966,7 @@ sub Setprop_backdate($$$) {
 Used to set the current mood for the journal being written. This takes a string which
 describes the mood.
 
-It is better to use C<$lj-<gt>SetMood()> as that will automatically use a
+It is better to use C<$lj-E<gt>SetMood()> as that will automatically use a
 mood known to the LiveJournal server if it can.
 
 Returns C<1> on success, C<0> on failure.
@@ -1967,7 +1999,7 @@ object was created with either C<moods> set to C<0> or
 with C<fast> set to C<1> then this function will not attempt to validate
 the C<mood_id> given to it.
 
-It is better to use C<$lj-<gt>SetMood()> as that will automatically use a
+It is better to use C<$lj-E<gt>SetMood()> as that will automatically use a
 mood known to the LiveJournal server if it can.
 
 Returns C<1> on success, C<0> on failure.
@@ -2146,8 +2178,8 @@ sub Setprop_unknown8bit($$$) {
 =item $lj->PostEntry($event)
 
 Submit a journal entry into the LiveJournal system. This requires you to have
-set up the journal entry with C<$lj-<gt>NewEntry()> and to have at least called
-C<$lj-<gt>SetEntry()>.
+set up the journal entry with C<$lj-E<gt>NewEntry()> and to have at least called
+C<$lj-E<gt>SetEntry()>.
 
 On success a list containing the following is returned:
 
@@ -2222,12 +2254,12 @@ sub PostEntry($$) {
 
 Edit an entry from the LiveJournal system which has the givem C<item_id>.
 The entry should have been fetched from LiveJournal using the
-C<$lj-<gt>GetEntries()> function and then adjusted using the various
-C<$lj-<gt>Set...()> functions.
+C<$lj-E<gt>GetEntries()> function and then adjusted using the various
+C<$lj-E<gt>Set...()> functions.
 
 It should be noted that this function can be used to delete a journal entry
 by setting the entry to a blank string, I<i.e.> by using
-C<$lj-<gt>SetEntry(\%Event,undef)>
+C<$lj-E<gt>SetEntry(\%Event,undef)>
 
 Returns C<1> on success, C<0> on failure.
 
@@ -2356,7 +2388,7 @@ The C<type> of entry can be one of the following letters:
   T: To-do items
 
 It should be noted that currently the LiveJournal system will only ever
-return "C<L>" types due to the C<C> and C<T> types not having been implemented
+return C<L> types due to the C<C> and C<T> types not having been implemented
 in the LiveJournal code yet.
 
 The C<action> of the entry can be either C<create> for a new entry,
@@ -2544,7 +2576,7 @@ value in the C<$type> variable. Thus:
 
 Example code:
 
-The following code only uses a single C<$type> from the above list; "C<one>".
+The following code only uses a single C<$type> from the above list; C<one>.
 However the hash of hashes returned is the same in every C<$type> used. The
 code below shows how to pull down the last journal entry posted and then uses
 all of the various C<Get*()> routines to decode the hash returned.
@@ -3561,11 +3593,31 @@ sub SendRequest($$$$) {
   close(SOCK);
 
   ## We've got the response from the server, so we now parse it
+  if (!defined $response) {
+    $LJ::Simple::error="Failed to get result from server";
+    return 0;
+  }
+
+  ## Ensure that response isn't zero length
+  if (length($response) == 0) {
+    $LJ::Simple::error="Zero length response from server";
+    return 0;
+  }
+
   # First remove all \r's
   $response=~s/\r//go;
 
   # Split into headers and body
   my ($http,$body)=split(/\n\n/,$response,2);
+
+  if (!defined $http) {
+    $LJ::Simple::error="Failed to get HTTP headers from server";
+    return 0;
+  }
+  if (!defined $body) {
+    $LJ::Simple::error="Failed to get HTTP body from server";
+    return 0;
+  }
 
   # First lets see if we got a valid response
   $self->{request}->{http}={};
