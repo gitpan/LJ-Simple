@@ -17,7 +17,7 @@ publish: dist
 	if [ ! -d \$\$dest ] ; then \\
 	  mkdir -p \$\$dest ; \\
 	fi ; \\
-	mv \$\$tar \$\$dest ; \\
+	cp \$\$tar \$\$dest ; \\
 	pod2html \$(VERSION_FROM) > \$\$dest/\$(VERSION_FROM).htm ; \\
 	rm -rf pod2htm* ; \\
 	cp Changes \$\$dest/Changes.txt ; \\

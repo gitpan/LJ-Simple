@@ -9,7 +9,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 our @EXPORT = qw();
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -19,6 +19,7 @@ use POSIX;		# For errno values and other POSIX functions
 ## Helper function prototypes
 sub Debug(@);
 sub EncVal($$);
+sub DecVal($);
 sub SendRequest($$$$);
 sub dump_list($$);
 sub dump_hash($$);
@@ -101,6 +102,7 @@ LJ::Simple - Simple Perl to access LiveJournal
   $lj->PostEntry($event)
   $lj->DeleteEntry($item_id)
   $lj->SyncItems($time_t)
+  $lj->GetEntries($hash_ref,$journal,$type,@opt)
 
   # Routines which do more than just set a value within
   # a new journal entry
@@ -128,6 +130,29 @@ LJ::Simple - Simple Perl to access LiveJournal
   $lj->Setprop_noemail($event,$onoff)
   $lj->Setprop_unknown8bit($event,$onoff)
 
+  # Routines which do more than just get a value from
+  # a journal entry
+  $lj->GetDate($event)
+  $lj->GetItemId($event)
+  $lj->GetURL($event)
+
+  # Routines for getting subject and journal contents
+  $lj->GetSubject($event)
+  $lj->GetEntry($event)
+
+  # Routines for getting permissions on an entry
+  $lj->GetProtect($event)
+
+  # Getting properties for an entry
+  $lj->Getprop_backdate($event)
+  $lj->Getprop_current_mood($event)
+  $lj->Getprop_current_mood_id($event)
+  $lj->Getprop_current_music($event)
+  $lj->Getprop_preformatted($event)
+  $lj->Getprop_nocomments($event)
+  $lj->Getprop_picture_keyword($event)
+  $lj->Getprop_noemail($event)
+  $lj->Getprop_unknown8bit($event)
 
 =head1 DESCRIPTION
 
@@ -1429,7 +1454,7 @@ sub NewEntry($$) {
 
 Sets the date for the event being built from the given C<time_t> (i.e. seconds
 since epoch) value. Bare in mind that you may need to call
-C<$lj->Setprop_backdate(\%Event,1)> to backdate the journal entry if the journal being
+C<$lj-<gt>Setprop_backdate(\%Event,1)> to backdate the journal entry if the journal being
 posted to has events more recent than the date being set here. Returns C<1> on
 success, C<0> on failure.
 
@@ -1486,7 +1511,7 @@ sub SetDate($$$) {
 =item $lj->SetMood($event,$mood)
 
 Given a mood this routine sets the mood for the journal entry. Unlike the
-more direct C<$lj->Setprop_current_mood()> and C<$lj->Setprop_current_mood_id(\%Event,)>
+more direct C<$lj-<gt>Setprop_current_mood()> and C<$lj-<gt>Setprop_current_mood_id(\%Event,)>
 routines, this routine will attempt to first attempt to find the mood given
 to it in the mood list returned by the LiveJournal server. If it is unable to
 find a suitable mood then it uses the text given.
@@ -1653,14 +1678,14 @@ sub SetEntry($$@) {
 
 Adds a string to the existing journal entry being worked on. The new data
 will be appended to the existing entry with a newline separating them.
-It should be noted that as with C<$lj->SetEntry()> the list given to
+It should be noted that as with C<$lj-<gt>SetEntry()> the list given to
 this routine will be C<join()>ed together with a newline between each 
 list entry.
 
-If C<$lj->SetEntry()> has not been called then C<$lj->AddToEntry()> acts
-in the same way as C<$lj->SetEntry()>.
+If C<$lj-<gt>SetEntry()> has not been called then C<$lj-<gt>AddToEntry()> acts
+in the same way as C<$lj-<gt>SetEntry()>.
 
-If C<$lj->SetEntry()> has already been called then calling C<$lj->AddToEntry()>
+If C<$lj-<gt>SetEntry()> has already been called then calling C<$lj-<gt>AddToEntry()>
 with a null list or a list which starts with C<undef> is a NOP.
 
 Returns C<1> on success, C<0> otherwise.
@@ -1875,7 +1900,7 @@ sub Setprop_backdate($$$) {
 Used to set the current mood for the journal being written. This takes a string which
 describes the mood.
 
-It is better to use C<$lj->SetMood()> as that will automatically use a
+It is better to use C<$lj-<gt>SetMood()> as that will automatically use a
 mood known to the LiveJournal server if it can.
 
 Returns C<1> on success, C<0> on failure.
@@ -1908,7 +1933,7 @@ object was created with either C<moods> set to C<0> or
 with C<fast> set to C<1> then this function will not attempt to validate
 the C<mood_id> given to it.
 
-It is better to use C<$lj->SetMood()> as that will automatically use a
+It is better to use C<$lj-<gt>SetMood()> as that will automatically use a
 mood known to the LiveJournal server if it can.
 
 Returns C<1> on success, C<0> on failure.
@@ -2086,8 +2111,8 @@ sub Setprop_unknown8bit($$$) {
 =item $lj->PostEntry(\$event)
 
 Submit a journal entry into the LiveJournal system. This requires you to have
-set up the journal entry with C<$lj->NewEntry()> and to have at least called
-C<$lj->SetEntry()>.
+set up the journal entry with C<$lj-<gt>NewEntry()> and to have at least called
+C<$lj-<gt>SetEntry()>.
 
 On success a list containing the following is returned:
 
@@ -2173,6 +2198,15 @@ Example:
 sub DeleteEntry($$) {
   my $self=shift;
   my ($item_id) = @_;
+  $LJ::Simple::error="";
+  if (!defined $item_id) {
+    $LJ::Simple::error="CODE: DeleteEntry() given undefined item_id";
+    return 0;
+  }
+  if ($item_id!~/^[0-9]+$/) {
+    $LJ::Simple::error="CODE: DeleteEntry() given invalid item_id";
+    return 0;
+  }
   my %Event=(
 	itemid	=>	$item_id,
 	event	=>	"",
@@ -2218,9 +2252,9 @@ by the timestamps of the entries, oldest to newest.
 
 The C<type> of entry can be one of the following letters:
 
-  C<L>: Journal entries
-  C<C>: Comments
-  C<T>: To-do items
+  L: Journal entries
+  C: Comments
+  T: To-do items
 
 It should be noted that currently the LiveJournal system will only ever
 return "C<L>" types due to the C<C> and C<T> types not having been implemented
@@ -2279,6 +2313,7 @@ Example code:
 sub SyncItems($$) {
   my $self=shift;
   my ($timet)=@_;
+  $LJ::Simple::error="";
   if ($LJ::Simple::debug) {
     my $ts=undef;
     if (defined $timet) {
@@ -2292,7 +2327,12 @@ sub SyncItems($$) {
   my %Resp=();
   if (defined $timet) {
     if ($timet=~/^[0-9]+$/) {
-      $Event{lastsync}=strftime("%Y-%m-%d %H:%M:%S",gmtime($timet));
+      my @tm=gmtime($timet);
+      if ($#tm==-1) {
+        $LJ::Simple::error="CODE: Invalid timestamp";
+        return undef;
+      }
+      $Event{lastsync}=strftime("%Y-%m-%d %H:%M:%S",@tm);
     } else {
       $Event{lastsync}=$timet;
     }
@@ -2356,6 +2396,830 @@ sub SyncItems($$) {
   return ($tot,@lst);
 }
 
+=pod
+
+=item $lj->GetEntries($hash_ref,$journal,$type,@opt)
+
+This routine allows you to pull events from the user's LiveJournal. There are
+several different ways for this routine to work depending on the value given in
+the C<$type> argument.
+
+The first argument - C<$hash_ref> is a reference to a hash which will be filled
+with the details of the journal entries downloaded. The key to this hash is the
+C<item_id> of the journal entries. The value is a hash reference which points to
+a hash of the same type created by C<NewPost()> and used by C<PostEntry()> and
+C<EditEntry()>. The most sensible way to access this hash is to use the various
+C<Get*()> routines.
+
+The second argument - C<$journal> - is an optional argument set if the journal
+to be accessed is a shared journal. If not required set this to C<undef>.
+
+The third argument - C<$type> - specifies how the journal entries are to be
+pulled down. The contents of the fourth argument - C<@opt> - will depend on the
+value in the C<$type> variable. Thus:
+
+  +-------+------------+------------------------------------------+
+  | $type | @opt       | Comments                                 |
+  +-------+------------+------------------------------------------+
+  | day   | $timestamp | Download a single day. $timestamp is a   |
+  |       |            | Unix timestamp for the required day      |
+  +-------+------------+------------------------------------------+
+  | lastn |$num,$before| Download a number of entries. $num has a |
+  |       |            | maximum value of 50. If $num is undef    |
+  |       |            | then the default of 20 is used. $before  |
+  |       |            | is an optional value which specifies a   |
+  |       |            | date before which all entries must occur.|
+  |       |            | The date is specified as a Unix          |
+  |       |            | timestamp. If not specified the value    |
+  |       |            | should be undef.                         |
+  +-------+------------+------------------------------------------+
+  | one   | $item_id   | The unique ItemID for the entry to be    |
+  |       |            | downloaded. A value of -1 means to       |
+  |       |            | download the most recent entry           |
+  +-------+------------+------------------------------------------+
+  | sync  | $date      | Get journal entries since the given date.|
+  |       |            | The date should be specified as a Unix   |
+  |       |            | timestamp.                               |
+  +-------+------------+------------------------------------------+
+
+
+Example code:
+
+The following code only uses a single C<$type> from the above list; "C<one>".
+However the hash of hashes returned is the same in every C<$type> used. The
+code below shows how to pull down the last journal entry posted and then uses
+all of the various C<Get*()> routines to decode the hash returned.
+
+  use POSIX;
+  
+  my %Entries=();
+  (defined $lj->GetEntries(\%Entries,undef,"one",-1)) ||
+    die "$0: Failed to get entries - $LJ::Simple::error\n";
+  
+  my $Entry=undef;
+  my $Format="%-20s: %s\n";
+
+  foreach $Entry (values %Entries) {
+  
+    # Get URL
+    my $url=$lj->GetURL($Entry);
+    (defined $url) && print "$url\n";
+  
+    # Get ItemId
+    my ($item_id,$anum,$html_id)=$lj->GetItemId($Entry);
+    (defined $item_id) && printf($Format,"Item_id",$item_id);
+  
+    # Get the subject
+    my $subj=$lj->GetSubject($Entry);
+    (defined $subj) && printf($Format,"Subject",$subj);
+  
+    # Get the date entry was posted
+    my $timet=$lj->GetDate($Entry);
+    if (defined $timet) {
+      printf($Format,"Date",
+             strftime("%Y-%m-%d %H:%M:%S",gmtime($timet)));
+    }
+  
+    # Is entry protected ?
+    my $EntProt="";
+    my ($protect,@prot_opt)=$lj->GetProtect($Entry);
+    if (defined $protect) {
+      if ($protect eq "public") {
+         $EntProt="public";
+      } elsif ($protect eq "friends") {
+        $EntProt="friends only";
+      } elsif ($protect eq "groups") {
+        $EntProt=join("","only groups - ",join(", ",@prot_opt));
+      } elsif ($protect eq "private") {
+        $EntProt="private";
+      }
+      printf($Format,"Journal access",$EntProt);
+    }
+  
+    ## Properties
+    # Backdated ?
+    my $word="no";
+    my $prop=$lj->Getprop_backdate($Entry);
+    if ((defined $prop) && ($prop==1)) { $word="yes" }
+    printf($Format,"Backdated",$word);
+  
+    # Preformatted ?
+    $word="no";
+    $prop=$lj->Getprop_preformatted($Entry);
+    if ((defined $prop) && ($prop==1)) { $word="yes" }
+    printf($Format,"Preformatted",$word);
+  
+    # No comments allowed ?
+    $word="no";
+    $prop=$lj->Getprop_nocomments($Entry);
+    if ((defined $prop) && ($prop==1)) { $word="yes" }
+    printf($Format,"No comments",$word);
+  
+    # Do not email comments ?
+    $word="no";
+    $prop=$lj->Getprop_noemail($Entry);
+    if ((defined $prop) && ($prop==1)) { $word="yes" }
+    printf($Format,"No emailed comments",$word);
+  
+    # Unknown 8-bit ?
+    $word="no";
+    $prop=$lj->Getprop_unknown8bit($Entry);
+    if ((defined $prop) && ($prop==1)) { $word="yes" }
+    printf($Format,"Any 8 bit, non UTF-8",$word);
+  
+    # Current music
+    $word="[None]";
+    $prop=$lj->Getprop_current_music($Entry);
+    if ((defined $prop) && ($prop ne "")) { $word=$prop }
+    printf($Format,"Current music",$word);
+  
+    # Current mood [text]
+    $word="[None]";
+    $prop=$lj->Getprop_current_mood($Entry);
+    if ((defined $prop) && ($prop ne "")) { $word=$prop }
+    printf($Format,"Current mood",$word);
+  
+    # Current mood [id]
+    $word="[None]";
+    $prop=$lj->Getprop_current_mood_id($Entry);
+    if ((defined $prop) && ($prop ne "")) { $word=$prop }
+    printf($Format,"Current mood_id",$word);
+  
+    # Picture keyword
+    $word="[None]";
+    $prop=$lj->Getprop_picture_keyword($Entry);
+    if ((defined $prop) && ($prop ne "")) { $word=$prop }
+    printf($Format,"Picture keyword",$word);
+  
+    # Finally output the actual journal entry
+    printf($Format,"Journal entry","");
+    my $text=$lj->GetEntry($Entry);
+    (defined $text) &&
+      print "  ",join("\n  ",split(/\n/,$text)),"\n\n";
+  }
+
+=cut
+sub GetEntries($$@) {
+  my $self=shift;
+  my ($hr,$journal,$type,@opts)=@_;
+  $LJ::Simple::error="";
+  if (ref($hr) ne "HASH") {
+    $LJ::Simple::error="CODE: GetEntries() not given a hash reference";
+    return undef;
+  }
+  %{$hr}=();
+  my %Event=();
+  my %Resp=();
+  if (defined $journal) {
+    $Event{usejournal}=$journal;
+  }
+  my $ctype=lc($type);
+  if ($ctype eq "day") {
+    if ($#opts<0) {
+      $LJ::Simple::error="CODE: GetEntries($type) requires year,month,day in \@opts";
+      return undef;
+    }
+    my ($timestamp)=@opts;
+    if ($timestamp!~/^[0-9]+$/) {
+      $LJ::Simple::error="CODE: GetEntries($type) given invalid timestamp";
+      return undef;
+    }
+    my @tm=gmtime($timestamp);
+    if ($#tm==-1) {
+      $LJ::Simple::error="CODE: GetEntries($type) given invalid timestamp";
+      return undef;
+    }
+    $Event{selecttype}=$ctype;
+    $Event{year}=$tm[5]+1900;
+    $Event{month}=$tm[4]+1;
+    $Event{day}=$tm[3];
+  } elsif ($ctype eq "lastn") {
+    if ($#opts<1) {
+      $LJ::Simple::error="CODE: GetEntries($type) requires num and beforedate in \@opts";
+      return undef;
+    }
+    $Event{selecttype}=$ctype;
+    my ($num,$beforedate)=@opts;
+    if (defined $num) {
+      if ($num!~/^[0-9]{1,2}$/) {
+        $LJ::Simple::error="CODE: GetEntries($type) requires valid number for num";
+        return undef;
+      }
+      if ($num>50) {
+        $LJ::Simple::error="Maximum number of journal entries returned is 50";
+        return undef;
+      }
+    } else {
+      $num=20;
+    }
+    $Event{howmany}=$num;
+    if (defined $beforedate) {
+      if ($beforedate!~/^[0-9]+$/) {
+        $LJ::Simple::error="Invalid Unix timestamp";
+        return undef;
+      }
+      my @tm=gmtime($beforedate);
+      if ($#tm==-1) {
+        $LJ::Simple::error="CODE: GetEntries($type) given invalid timestamp";
+        return undef;
+      }
+      $Event{beforedate}=strftime("%Y-%m-%d %H:%M:%S",@tm);
+    }
+  } elsif ($ctype eq "one") {
+    if ($#opts<0) {
+      $LJ::Simple::error="CODE: GetEntries($type) requires item_id in \@opts";
+      return undef;
+    }
+    my ($item_id)=@opts;
+    if ($item_id!~/^-*[0-9]+$/) {
+      $LJ::Simple::error="Invalid item_id";
+      return undef;
+    }
+    if ($item_id<-1) {
+      $LJ::Simple::error="Invalid item_id";
+      return undef;
+    }
+    $Event{selecttype}=$ctype;
+    $Event{itemid}=$item_id;
+  } elsif ($ctype eq "sync") {
+    if ($#opts<0) {
+      $LJ::Simple::error="CODE: GetEntries($type) requires timestamp in \@opts";
+      return undef;
+    }
+    my ($lastsync)=@opts;
+    if ($lastsync!~/^[0-9]+$/) {
+      $LJ::Simple::error="Invalid Unix timestamp";
+      return undef;
+    }
+    my @tm=gmtime($lastsync);
+    if ($#tm==-1) {
+      $LJ::Simple::error="CODE: GetEntries($type) given invalid timestamp";
+      return undef;
+    }
+    $Event{lastsync}=strftime("%Y-%m-%d %H:%M:%S",@tm);
+    $Event{selecttype}="syncitems";
+  } else {
+    $LJ::Simple::error="CODE: GetEntries() does not understand type $type\n";
+    return undef;
+  }
+  $self->SendRequest("getevents",\%Event,\%Resp) || return undef;
+  my %Ev=();
+  my %Pr=();
+  my ($k,$v);
+  while(($k,$v)=each %Resp) {
+    my ($num,$key,$hash)=(undef,undef,undef);
+    if ($k=~/^events_([0-9]+)_(.*)$/) {
+      ($num,$key,$hash)=($1,$2,\%Ev);
+    } elsif ($k=~/^prop_([0-9]+)_(.*)$/) {
+      ($num,$key,$hash)=($1,$2,\%Pr);
+    }
+    if (defined $hash) {
+      (exists $hash->{$num}) || ($hash->{$num}={});
+      $hash->{$num}->{$key}=$v;
+    }
+  }
+  my $ehr=undef;
+  foreach $ehr (values %Ev) {
+    my $itemid=$ehr->{itemid};
+    $hr->{$itemid}={};
+    my $nhr=$hr->{$itemid};
+    %{$nhr}=(
+      __htmlid		=>	($ehr->{itemid} * 256) + $ehr->{anum},
+      __anum		=>	$ehr->{anum},
+      __itemid		=>	$itemid,
+      event		=>	$ehr->{event},
+      lineenddings	=>	"unix",
+    );
+    (exists $ehr->{subject}) && ($nhr->{subject}=$ehr->{subject});
+    (exists $ehr->{allowmask}) && ($nhr->{allowmask}=$ehr->{allowmask});
+    (exists $ehr->{security}) && ($nhr->{security}=$ehr->{security});
+    if ($ehr->{eventtime}=~/([0-9]+)-([0-9]+)-([0-9]+)\s([0-9]+):([0-9]+):([0-9]+)/o) {
+      $nhr->{year}=int($1);
+      $nhr->{mon}=int($2);
+      $nhr->{day}=int($3);
+      $nhr->{hour}=int($4);
+      $nhr->{min}=int($5);
+      my $timet=mktime($6,$5,$4,$3,$2-1,$1-1900);
+      if (!defined $timet) {
+        $LJ::Simple::error="Failed to mktime() from \"$ehr->{eventtime}\" for itemid $hr->{$ehr->{itemid}}->{__htmlid}";
+        return undef;
+      }
+      $nhr->{__timet}=$timet;
+    } else {
+      $LJ::Simple::error="Failed to parse eventtime \"$ehr->{eventtime}\" for itemid $hr->{$ehr->{itemid}}->{__htmlid}";
+      return undef;
+    }
+  }
+  my $phr=undef;
+  foreach $phr (values %Pr) {
+    if (!exists $hr->{$phr->{itemid}}) {
+      $LJ::Simple::error="Protocol error: properties returned for itemid not seen";
+      return undef;
+    }
+    my $nhr=$hr->{$phr->{itemid}};
+    my $k=join("_","prop",$phr->{name});
+    if (!exists $nhr->{$k}) {
+      $nhr->{$k}=$phr->{value};
+    }
+  }
+  return $hr;
+}
+
+=pod 
+
+=item $lj->GetDate($event)
+
+Gets the date for the event given. The date is returned as a C<time_t> (i.e. seconds
+since epoch) value. Returns C<undef> on failure.
+
+Example code:
+
+  use POSIX;  # For strftime()
+  
+  ## Get date
+  my $timet=$lj->GetDate(\%Event);
+  (defined $timet)
+    || die "$0: Failed to set date of entry - $LJ::Simple::error\n";
+  
+  # Get time list using gmtime()
+  my @tm=gmtime($timet);
+  ($#tm<0) &&
+    die "$0: Failed to run gmtime() on time_t $timet\n";
+  
+  # Format date in the normal way used by LJ "YYYY-MM-DD hh:mm:ss"
+  my $jtime=strftime("%Y-%m-%d %H:%M:%S",@tm);
+
+=cut
+sub GetDate($$) {
+  my $self=shift;
+  my ($event)=@_;
+  $LJ::Simple::error="";
+  if (ref($event) ne "HASH") {
+    $LJ::Simple::error="CODE: Not given a hash reference";
+    return undef;
+  }
+  if (!exists $event->{__timet}) {
+    $LJ::Simple::error="No time value stored";
+    return undef;
+  }
+  return $event->{__timet};
+}
+
+
+=pod
+
+=item $lj->GetItemId($event)
+
+Returns a list which contains the real C<item_id>, C<anum> and HTMLised C<item_id> which
+can be used to contruct a URL suitable for accessing the item via the web.
+Returns C<undef> on failure. Note that you must only use this
+routine on entries which have been returned by the C<GetEntries()>
+routine.
+
+Example code:
+
+  my ($item_id,$anum,$html_id)=$lj->GetItemId(\%Event);
+  (defined $item_id)
+    || die "$0: Failed to get item id - $LJ::Simple::error\n";
+
+=cut
+sub GetItemId($$) {
+  my $self=shift;
+  my ($event)=@_;
+  $LJ::Simple::error="";
+  if (ref($event) ne "HASH") {
+    $LJ::Simple::error="CODE: Not given a hash reference";
+    return undef;
+  }
+  if (!exists $event->{__itemid}) {
+    $LJ::Simple::error="item_id does not exist - must use GetEntries()";
+    return undef;
+  }
+  if (!exists $event->{__anum}) {
+    $LJ::Simple::error="anum does not exist - must use GetEntries()";
+    return undef;
+  }
+  if (!exists $event->{__htmlid}) {
+    $LJ::Simple::error="HTML id does not exist - must use GetEntries()";
+    return undef;
+  }
+  return ($event->{__itemid},$event->{__anum},$event->{__htmlid});
+}
+
+
+=pod
+
+=item $lj->GetURL($event)
+
+Returns the URL which can be used to access the journal entry via a web
+browser. Returns C<undef> on failure. Note that you must only use this
+routine on entries which have been returned by the C<GetEntries()>
+routine.
+
+Example code:
+
+  my $url=$lj->GetURL(\%Event);
+  (defined $url)
+    || die "$0: Failed to get URL - $LJ::Simple::error\n";
+  system("netscape -remote 'openURL($url)'");
+
+=cut
+sub GetURL($$) {
+  my $self=shift;
+  my ($event)=@_;
+  $LJ::Simple::error="";
+  if (ref($event) ne "HASH") {
+    $LJ::Simple::error="CODE: Not given a hash reference";
+    return undef;
+  }
+  if (!exists $event->{__htmlid}) {
+    $LJ::Simple::error="HTML id does not exist - must use GetEntries()";
+    return undef;
+  }
+  my $user=$self->user();
+  my $server=$self->{lj}->{host};
+  my $port=$self->{lj}->{port};
+  my $htmlid=$event->{__htmlid};
+  return "http://$server:$port/talkpost.bml\?journal=$user\&itemid=$htmlid";
+}
+
+=pod
+
+=item $lj->GetSubject($event)
+
+Gets the subject for the journal entry. Returns the subject if it is
+available, C<undef> otherwise.
+
+Example code:
+
+  my $subj=$lj->GetSubject(\%Event)
+  if (defined $subj) {
+    print "Subject: $subj\n";
+  }
+
+=cut
+sub GetSubject($$) {
+  my $self=shift;
+  my ($event) = @_;
+  $LJ::Simple::error="";
+  if (ref($event) ne "HASH") {
+    $LJ::Simple::error="CODE: Not given a hash reference";
+    return undef;
+  }
+  if (!exists $event->{subject}) {
+    $LJ::Simple::error="No subject set";
+    return undef;
+  }
+  return $event->{subject};
+}
+
+
+=pod
+
+=item $lj->GetEntry($event)
+
+Gets the entry for the journal. Returns either a single string which contains
+the entire journal entry or C<undef> on failure.
+
+Example code:
+
+  my $ent = $lj->GetEntry(\%Event);
+  (defined $ent)
+    || die "$0: Failed to get entry - $LJ::Simple::error\n";
+  print "Entry: $ent\n";
+
+=cut
+sub GetEntry($$) {
+  my $self=shift;
+  my ($event) = @_;
+  $LJ::Simple::error="";
+  if (ref($event) ne "HASH") {
+    $LJ::Simple::error="CODE: Not given a hash reference";
+    return undef;
+  }
+  if (!exists $event->{event}) {
+    $LJ::Simple::error="No journal entry set";
+    return undef;
+  }
+  return $event->{event};
+}
+
+
+=pod
+
+=item $lj->GetProtect($event)
+
+Gets the protection information on the event given. Returns a list with
+details of the protection set on the post. On failure C<undef> is returned.
+
+There are several different types of protection which can be returned for a
+journal entry. These include public, friends only, specific friends groups
+and private. The list returned will always have the type of protection listed
+first followed by any details of that protection. Thus the list can contain:
+
+  ("public")
+    A publically accessable journal entry
+  
+  ("friends")
+    Only friends may read the entry
+    
+  ("groups","group1" ...)
+    Only users listed in the friends groups given after the "groups"
+    may read the entry
+  
+  ("private")
+    Only the owner of the journal may read the entry
+
+Example code:
+
+  my ($protect,@prot_opt)=$lj->GetProtect(\%Event);
+  (defined $protect) ||
+    die "$0: Failed to get entry protection type - $LJ::Simple::error\n";
+  if ($protect eq "public") {
+    print "Journal entry is public\n";
+  } elsif ($protect eq "friends") {
+    print "Journal entry only viewable by friends\n"; 
+  } elsif ($protect eq "groups") {
+    print "Journal entry only viewable by friends in the following groups:\n";
+    print join(", ",@prot_opt),"\n";
+  } elsif ($protect eq "private") {
+    print "Journal entry only viewable by the journal owner\n"; 
+  }
+
+=cut
+sub GetProtect($$) {
+  my $self=shift;
+  my ($event)=@_;
+  $LJ::Simple::error="";
+  if (ref($event) ne "HASH") {
+    $LJ::Simple::error="CODE: Not given a hash reference";
+    return undef;
+  }
+  if ((!exists $event->{security})||($event->{security} eq "")) {
+    return "public";
+  }
+  if ($event->{security} eq "private") {
+    return "private";
+  }
+  if ($event->{security} ne "usemask") {
+    $LJ::Simple::error="INTERNAL: security contains unknown value \"$event->{security}\"";
+    return undef;
+  }
+  if (($event->{allowmask} & 1) == 1) {
+    return "friends";
+  }
+  my @lst=("groups");
+  my $g=undef;
+  foreach $g (keys %{$self->{groups}->{name}}) {
+    my $bit=1 << $self->{groups}->{name}->{$g}->{id};
+    if (($event->{allowmask} & $bit) == $bit) {
+      push(@lst,$g);
+    }
+  }
+  return @lst;
+}
+
+
+##
+## Helper function used to get meta data
+##
+sub Getprop_general($$$$$) {
+  my ($self,$event,$prop,$caller,$type)=@_;
+  $LJ::Simple::error="";
+  if (ref($event) ne "HASH") {
+    $LJ::Simple::error="CODE: Not given a hash reference";
+    return undef;
+  }
+  my $key=join("_","prop",$prop);
+  if (!exists $event->{$key}) {
+    if ($type eq "bool") {
+      return 0;
+    }
+    return "";
+  }
+  return $event->{$key};
+}
+
+=pod
+
+=item $lj->Getprop_backdate($event)
+
+Indicates if the journal entry is back dated or not. Back dated
+entries do not appear on the friends view of your journal entries. Returns
+C<1> if the entry is backdated, C<0> if it is not. C<undef> is returned in the
+event of an error.
+
+Example code:
+
+  my $prop=$lj->Getprop_backdate(\%Event);
+  (defined $prop) ||
+    die "$0: Failed to get property - $LJ::Simple::error\n";
+  if ($prop) {
+    print STDERR "Journal is backdated\n";
+  } else {
+    print STDERR "Journal is not backdated\n";
+  }
+  
+
+=cut
+sub Getprop_backdate($$) {
+  my ($self,$event)=@_;
+  $LJ::Simple::error="";
+  return $self->Getprop_general($event,"opt_backdated","Getprop_backdate","bool");
+}
+
+
+=pod
+
+=item $lj->Getprop_current_mood($event)
+
+Used to get the current mood for the journal being written. This returns the
+mood if one exists, an empty string if none exists or C<undef> in the event
+of an error.
+
+Example code:
+
+  my $prop=$lj->Getprop_current_mood(\%Event);
+  (defined $prop) ||
+    die "$0: Failed to get property - $LJ::Simple::error\n";
+  if ($prop ne "") {
+    print STDERR "Journal has mood of $prop\n";
+  } else {
+    print STDERR "Journal has no mood set\n";
+  }
+
+
+=cut
+sub Getprop_current_mood($$) {
+  my ($self,$event)=@_;
+  $LJ::Simple::error="";
+  return $self->Getprop_general($event,"current_mood","Getprop_current_mood","char");
+}
+
+=pod
+
+=item $lj->Getprop_current_mood_id($event)
+
+Used to get the current mood_id for the journal being written. Will return
+the mood_id if one is set, a null string is one is not set and C<undef> in
+the event of an error.
+
+Example code:
+
+  my $prop=$lj->Getprop_current_mood_id(\%Event);
+  (defined $prop) ||
+    die "$0: Failed to get property - $LJ::Simple::error\n";
+  if ($prop ne "") {
+    print STDERR "Journal has mood_id of $prop\n";
+  } else {
+    print STDERR "Journal has no mood_id set\n";
+  }
+
+
+=cut
+sub Getprop_current_mood_id($$) {
+  my ($self,$event)=@_;
+  $LJ::Simple::error="";
+  return $self->Getprop_general($event,"current_moodid","Getprop_current_mood_id","num");
+}
+
+
+=pod
+
+=item $lj->Getprop_current_music($event)
+
+Used to get the current music for the journal entry being written. Returns
+the music if one is set, a null string is one is not set and C<undef> in
+the event of an error.
+
+Example code:
+
+  my $prop=$lj->Getprop_current_music(\%Event);
+  (defined $prop) ||
+    die "$0: Failed to get property - $LJ::Simple::error\n";
+  if ($prop) {
+    print STDERR "Journal has the following music: $prop\n";
+  } else {
+    print STDERR "Journal has no music set for it\n";
+  }
+
+=cut
+sub Getprop_current_music($$) {
+  my ($self,$event)=@_;
+  $LJ::Simple::error="";
+  return $self->Getprop_general($event,"current_music","Getprop_current_music","char");
+}
+
+=pod
+
+=item $lj->Getprop_preformatted($event)
+
+Used to see if the text for the journal entry being written is preformatted in HTML
+or not. This returns true (C<1>) if so, false (C<0>) if not.
+
+Example code:
+
+  $lj->Getprop_preformatted(\%Event) &&
+    print "Journal entry is preformatted\n";
+
+=cut
+sub Getprop_preformatted($$) {
+  my ($self,$event)=@_;
+  $LJ::Simple::error="";
+  return $self->Getprop_general($event,"opt_preformatted","Getprop_preformatted","bool");
+}
+
+
+=pod
+
+=item $lj->Getprop_nocomments($event)
+
+Used to see if the journal entry being written can be commented on or not.
+This returns true (C<1>) if so, false (C<0>) if not.
+
+Example code:
+
+  $lj->Getprop_nocomments(\%Event) &&
+    print "Journal entry set to disallow comments\n";
+
+=cut
+sub Getprop_nocomments($$) {
+  my ($self,$event)=@_;
+  $LJ::Simple::error="";
+  return $self->Getprop_general($event,"opt_nocomments","Getprop_nocomments","bool");
+}
+
+
+=pod
+
+=item $lj->Getprop_picture_keyword($event)
+
+Used to get the picture keyword for the journal entry being written. Returns
+the picture keyword if one is set, a null string is one is not set and C<undef> in
+the event of an error.
+
+Example code:
+
+  my $prop=$lj->Getprop_picture_keyword(\%Event);
+    (defined $prop) ||
+    die "$0: Failed to get property - $LJ::Simple::error\n";
+  if ($prop) {
+    print STDERR "Journal has picture keyword $prop set\n";
+  } else {
+    print STDERR "Journal has no picture keyword set\n";
+  }
+
+
+=cut
+sub Getprop_picture_keyword($$) {
+  my ($self,$event)=@_;
+  $LJ::Simple::error="";
+  return $self->Getprop_general($event,"picture_keyword","Getprop_picture_keyword","char");
+}
+
+
+=pod
+
+=item $lj->Getprop_noemail($event)
+
+Used to see if comments on the journal entry being written should be emailed or
+not. This returns true (C<1>) if so comments should B<not> be emailed and false
+(C<0>) if they should be emailed.
+
+Example code:
+
+  $lj->Getprop_noemail(\%Event) &&
+    print "Comments to journal entry not emailed\n";
+
+=cut
+sub Getprop_noemail($$) {
+  my ($self,$event)=@_;
+  $LJ::Simple::error="";
+  return $self->Getprop_general($event,"opt_noemail","Getprop_noemail","bool");
+}
+
+
+=pod
+
+=item $lj->Getprop_unknown8bit($event)
+
+Used see if there is 8-bit data which is not in UTF-8 in the journal entry
+being written. This returns true (C<1>) if so, false (C<0>) if not.
+
+Example code:
+
+  $lj->Getprop_unknown8bit(\%Event) &&
+    print "Journal entry contains 8-bit data not in UTF-8 format\n";
+
+=cut
+sub Getprop_unknown8bit($$) {
+  my ($self,$event)=@_;
+  $LJ::Simple::error="";
+  return $self->Getprop_general($event,"unknown8bit","Getprop_unknown8bit","bool");
+}
+
+
+
 ##### Start of helper functions
 
 ##
@@ -2369,6 +3233,17 @@ sub EncVal($$) {
   $val=~s/ /\+/go;
   $val=~s/([^a-z0-9+])/sprintf("%%%02x",ord($1))/egsi;
   return "$key=$val";
+}
+
+##
+## A helper function which takes an encoded value from HTTP
+## transit and decodes it
+##
+sub DecVal($) {
+  my ($val)=@_;
+  $val=~s/\+/ /go;
+  $val=~s/%([0-9A-F]{2})/pack("C", hex($1))/egsi;
+  return "$val";
 }
 
 ##
@@ -2426,6 +3301,7 @@ sub SendRequest($$$$) {
   } elsif ( ($mode eq "postevent")
          || ($mode eq "editevent") 
          || ($mode eq "syncitems") 
+         || ($mode eq "getevents") 
          || ($mode eq "getfriends") 
          || ($mode eq "friendof") 
          || ($mode eq "checkfriends") 
@@ -2610,8 +3486,10 @@ sub SendRequest($$$$) {
   $done=0;
   while (!$done) {
     if ($body=~/^([^\n]+)\n([^\n]+)\n(.*)$/so) {
-      $self->{request}->{lj}->{lc($1)}=$2;
-      $body=$3;
+      my ($k,$v)=(undef,undef);
+      ($k,$v,$body)=(lc($1),DecVal($2),$3);
+      $v=~s/\r\n/\n/go;
+      $self->{request}->{lj}->{$k}=$v;
     } else {
       $done=1;
     }
@@ -2673,6 +3551,7 @@ sub dump_list($$) {
     } else {
       my $lv=$le;
       if (defined $lv) {
+        $lv=~s/\n/\\n/go;
         $lv=quotemeta($lv);
         $lv=~s/\\-/-/go;
         $lv="\"$lv\"";
@@ -2706,7 +3585,10 @@ sub dump_hash($$) {
       $res="$res$sp\"$k\"\t=> \[\n" . dump_list($v,"$sp  ") . "$sp],\n";
     } else {
       if (defined $v) {
+        $v=~s/\n/\\n/go;
         $v=quotemeta($v);
+        $v=~s/\\\\n/\\n/go;
+        $v=~s/\\-/-/go;
         $v="\"$v\"";
       } else {
         $v="undef";

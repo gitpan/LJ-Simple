@@ -3,7 +3,7 @@
 
 #########################
 use Test;
-BEGIN { plan tests => 68 };
+BEGIN { plan tests => 97 };
 use LJ::Simple;
 ok(1); # If we made it this far, we're ok.
 #########################
@@ -234,6 +234,14 @@ if (!$lj->SetDate(\%Event,-3600)) {
   else { ok(0); }
 }
 
+# Set to script start time and check GetDate()
+$lj->SetDate(\%Event,$^T);
+my $timet=$lj->GetDate(\%Event);
+if (!defined $timet) { ok(0) }
+else {
+  if ($timet==$^T) { ok(1) } else { ok(0) }
+}
+
 ## Set properties
 if (!$lj->Setprop_backdate(\%Event,1)) { ok(0) } else { ok(1) }
 if (!$lj->Setprop_current_mood(\%Event,"Meep")) { ok(0) } else { ok(1) }
@@ -249,6 +257,25 @@ if (!$lj->Setprop_picture_keyword(\%Event,"Some photo")) {
 } else {
   ok(0);
 }
+my $prop=undef;
+$prop=$lj->GetURL(\%Event);
+if (defined $prop) {ok(0)} else  {ok(1)}
+$prop=$lj->Getprop_backdate(\%Event);
+if (!defined $prop) {ok(0)} elsif ($prop==1) {ok(1)} else {ok(0)}
+$prop=$lj->Getprop_current_mood(\%Event);
+if (!defined $prop) {ok(0)} elsif ($prop=="Meep") {ok(1)} else {ok(0)}
+$prop=$lj->Getprop_current_mood_id(\%Event);
+if (!defined $prop) {ok(0)} elsif ($prop==12) {ok(1)} else {ok(0)}
+$prop=$lj->Getprop_current_music(\%Event);
+if (!defined $prop) {ok(0)} elsif ($prop=="Collected dance") {ok(1)} else {ok(0)}
+$prop=$lj->Getprop_preformatted(\%Event);
+if (!defined $prop) {ok(0)} elsif ($prop==1) {ok(1)} else {ok(0)}
+$prop=$lj->Getprop_nocomments(\%Event);
+if (!defined $prop) {ok(0)} elsif ($prop==1) {ok(1)} else {ok(0)}
+$prop=$lj->Getprop_noemail(\%Event);
+if (!defined $prop) {ok(0)} elsif ($prop==1) {ok(1)} else {ok(0)}
+$prop=$lj->Getprop_unknown8bit(\%Event);
+if (!defined $prop) {ok(0)} elsif ($prop==1) {ok(1)} else {ok(0)}
 
 ## Set permissions
 if (!$lj->SetProtectPrivate(\%Event)) { ok(0) } else { ok(1) }
@@ -304,6 +331,7 @@ Bar
 EOF
 if (!$lj->SetEntry(\%Event,$entry)) { ok(0) } else { ok(1) }
 
+$lj->SetSubject(\%Event,"Test entry");
 $lj->SetMood(\%Event,"happy");
 $lj->Setprop_nocomments(\%Event,1);
 $lj->Setprop_backdate(\%Event,1);
@@ -331,9 +359,6 @@ if ((defined $num_of_items)&&($num_of_items>0)) {
   ok(0);
 }
 
-## Be nice and remove the test entry
-if (!$lj->DeleteEntry($item_id)) { ok(0) } else { ok(1) }
-
 my ($num_friends_of,@FriendOf)=$lj->GetFriendOf();
 if (defined $num_friends_of) { ok(1) } else {ok(0)}
 
@@ -351,6 +376,59 @@ if (defined $lj->GetDayCounts(\%gdc_hr,undef)) { ok(1) } else {ok(0)}
 my %gfg_hr=();
 if (defined $lj->GetFriendGroups(\$fooy)) { ok(0) } else {ok(1)}
 if (defined $lj->GetFriendGroups(\%gfg_hr)) { ok(1) } else {ok(0)}
+
+# First the checks to make sure that validation works
+my %GE_hr=();
+if (defined $lj->GetEntries(\$fooy)) { ok(0) } else {ok(1)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"day")) { ok(0) } else {ok(1)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"day",-1)) { ok(0) } else {ok(1)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"lastn")) { ok(0) } else {ok(1)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"lastn",1,-1)) { ok(0) } else {ok(1)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"lastn",51,1)) { ok(0) } else {ok(1)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"one")) { ok(0) } else {ok(1)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"one","abc")) { ok(0) } else {ok(1)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"one","-2")) { ok(0) } else {ok(1)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"one",-1)) { ok(1) } else {ok(0)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"sync")) { ok(0) } else {ok(1)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"sync",-1)) { ok(0) } else {ok(1)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"fooy")) { ok(0) } else {ok(1)}
+# Now we deal with stuff directly. First by day
+if (defined $lj->GetEntries(\%GE_hr,undef,"day",$^T)) {
+  if (exists $GE_hr{$item_id}) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+my $ev=(values %GE_hr)[0];
+$prop=$lj->GetURL($ev);
+if (defined $prop) {ok(1)} else {ok(0)}
+
+# lastn, get last 20 entries (default)
+if (defined $lj->GetEntries(\%GE_hr,undef,"lastn",undef,undef)) {
+  if (exists $GE_hr{$item_id}) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+# lastn, last 20 entries before current time
+if (defined $lj->GetEntries(\%GE_hr,undef,"lastn",undef,$^T)) {
+  if (!exists $GE_hr{$item_id}) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+# one, just our latest entry
+if (defined $lj->GetEntries(\%GE_hr,undef,"one",$item_id)) {
+  if (exists $GE_hr{$item_id}) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+# sync from yesturday
+if (defined $lj->GetEntries(\%GE_hr,undef,"sync",$^T-86400)) {
+  if (exists $GE_hr{$item_id}) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+
+## Be nice and remove the test entry
+if (!$lj->DeleteEntry($item_id)) { ok(0) } else { ok(1) }
 
 JTEST:
 

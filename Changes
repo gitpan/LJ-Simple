@@ -1,5 +1,16 @@
 Revision history for Perl extension LJ::Simple.
 
+0.06  Thursday October  3 14:30 2002
+	- Added GetURL() routine
+	- Added GetItemId() routine
+	- Added GetEntries() routine
+	- Added GetDate() routine
+	- Added GetSubject() routine
+	- Added GetEntry() routine
+	- Added GetProtect() routine
+	- Added Getprop_*() routines
+	- Fixed some POD errors
+
 0.05  Friday September 20 17:16 2002
 	- Added GetFriendGroups() routine
 	- Added GetDayCounts() routine
