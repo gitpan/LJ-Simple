@@ -1,5 +1,10 @@
 Revision history for Perl extension LJ::Simple.
 
+0.12.1  Wed Jan 12 21:13:35 GMT 2005
+	- Minor release for a fix to QuickPost() which caused a runtime error if a subject
+		was set. The documentation was also corrected to show that the entry option
+		is always required.
+
 0.12  Wed Jan  5 23:35:07 GMT 2005
 	- Added the $LJ::Simple::NonBlock hook to allow better integration with
 		GUI programs

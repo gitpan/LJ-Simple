@@ -9,7 +9,7 @@ require AutoLoader;
 @ISA = qw(Exporter AutoLoader);
 @EXPORT_OK = qw();
 @EXPORT = qw();
-$VERSION = '0.12';
+$VERSION = '0.12.1';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -373,7 +373,8 @@ this option is B<required>.
 
 =item entry
 
-The actual entry itself.
+The actual entry itself;
+this option is B<required>.
 
 =item subject
 
@@ -487,7 +488,7 @@ sub QuickPost(@) {
   $lj->NewEntry(\%Event) || return 0;
   $lj->SetEntry(\%Event,$opts{entry}) || return 0;
   (exists $opts{subject}) &&
-    ($lj->(\%Event,$opts{subject}) || return 0);
+    ($lj->SetSubject(\%Event,$opts{subject}) || return 0);
   (exists $opts{mood}) &&
     ($lj->SetMood(\%Event,$opts{mood}) || return 0);
   (exists $opts{music}) &&

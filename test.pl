@@ -31,7 +31,7 @@ if (LJ::Simple::QuickPost( user => $user, pass => $pass, entry => "foo" ) == 1)
  { ok(1) } else { ok(0) }
 if (LJ::Simple::QuickPost(
 		user => $user, pass => $pass, entry => "foo",
-                html => "foo"
+                html => "foo", 
     ) == 0) { ok(1) } else { ok(0) }
 if (LJ::Simple::QuickPost(
 		user => $user, pass => $pass, entry => "foo",
