@@ -9,7 +9,7 @@ require AutoLoader;
 @ISA = qw(Exporter AutoLoader);
 @EXPORT_OK = qw();
 @EXPORT = qw();
-$VERSION = '0.11';
+$VERSION = '0.12';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -28,144 +28,14 @@ sub dump_hash($$);
 
 =head1 NAME
 
-LJ::Simple - Simple Perl to access LiveJournal
+LJ::Simple - A perl module to access LiveJournal via its flat protocol
 
 =head1 SYNOPSIS
 
-  use LJ::Simple;
-
-  ## Variables - defaults are shown and normally you'll
-  ## not have to set any of the following. See below for
-  ## full details of these variables.
-
-  # Do we show debug info ?
-  $LJ::Simple::debug = 0;
-
-  # Do we show the LJ protocol ?
-  $LJ::Simple::protocol = 0;
-
-  # Do we show a raw protocol ?
-  $LJ::Simple::raw_protocol = 0;
-
-  # Do we use version 1 of the LJ protocol and thus support UTF-8 ?
-  $LJ::Simple::UTF = undef;
-
-  # Do we use the challenge-response system ?
-  $LJ::Simple::challenge = undef;
-
-  # Where error messages are placed
-  $LJ::Simple::error = "";
-
-  # The timeout on reading from sockets in seconds - default is 5 minutes
-  $LJ::Simple::timeout = 500;
-
-  # How much data to read from the socket in one read()
-  $LJ::Simple::buffer = 8192;
-
-  ## Object creation
-  my $lj = new LJ::Simple ( {
-		user	=>	"username",
-		pass	=>	"password",
-    } );
-  my $lj = new LJ::Simple ( {
-		user	=>	"username",
-		pass	=>	"password",
-		site	=>	"hostname[:port]",
-		proxy	=>	"hostname[:port]",
-		moods	=>	0 | 1,
-		pics	=>	0 | 1,
-		fast	=>	0 | 1,
-    } );
-  my $lj = LJ::Simple->login ( {
-		user	=>	"username",
-		pass	=>	"password",
-		site	=>	"hostname[:port]",
-		proxy	=>	"hostname[:port]",
-		moods	=>	0 | 1,
-		pics	=>	0 | 1,
-		fast	=>	0 | 1,
-    } );
-
-  ## Routines which pull information from the login data
-  $lj->message()
-  $lj->moods($hash_ref)
-  $lj->communities()
-  $lj->MemberOf($community)
-  $lj->groups($hash_ref)
-  $lj->MapGroupToId($group_name)
-  $lj->MapIdToGroup($id)
-  $lj->pictures($hash_ref)
-  $lj->DefaultPicURL();
-  $lj->user()
-  $lj->fastserver()
-
-  ## Routines which pull data from the LJ server
-  $lj->GetFriendOf()
-  $lj->GetFriends()
-  $lj->CheckFriends()
-  $lj->GetDayCounts()
-  $lj->GetFriendGroups()
-
-  ## Routines for handling journal entries
-  # Top level journal access routines
-  $lj->UseJournal($event,$journal)
-  $lj->NewEntry($event)
-  $lj->PostEntry($event)
-  $lj->EditEntry($event)
-  $lj->DeleteEntry($item_id)
-  $lj->SyncItems($time_t)
-  $lj->GetEntries($hash_ref,$journal,$type,@opt)
-
-  # Routines which do more than just set a value within
-  # a new journal entry
-  $lj->SetDate($event,$time_t)
-  $lj->SetMood($event,$mood)
-
-  # Routines for setting subject and journal contents
-  $lj->SetSubject($event,$subject)
-  $lj->SetEntry($event,@entry)
-  $lj->AddToEntry($event,@entry)
-
-  # Routines for setting permissions on the entry
-  $lj->SetProtectPublic($event)
-  $lj->SetProtectFriends($event)
-  $lj->SetProtectGroups($event,$group1, $group2, ... $groupN)
-  $lj->SetProtectPrivate($event)
-
-  # Setting properties for the entry
-  $lj->Setprop_backdate($event,$onoff)
-  $lj->Setprop_current_mood($event,$mood)
-  $lj->Setprop_current_mood_id($event,$id)
-  $lj->Setprop_current_music($event,$music)
-  $lj->Setprop_preformatted($event,$onoff)
-  $lj->Setprop_nocomments($event,$onoff)
-  $lj->Setprop_picture_keyword($event,$keyword)
-  $lj->Setprop_noemail($event,$onoff)
-  $lj->Setprop_unknown8bit($event,$onoff)
-
-  # Routines which do more than just get a value from
-  # a journal entry
-  $lj->GetDate($event)
-  $lj->GetItemId($event)
-  $lj->GetURL($event)
-
-  # Routines for getting subject and journal contents
-  $lj->GetSubject($event)
-  $lj->GetEntry($event)
-
-  # Routines for getting permissions on an entry
-  $lj->GetProtect($event)
-
-  # Getting properties for an entry
-  $lj->Getprop_backdate($event)
-  $lj->Getprop_current_mood($event)
-  $lj->Getprop_current_mood_id($event)
-  $lj->Getprop_current_music($event)
-  $lj->Getprop_preformatted($event)
-  $lj->Getprop_nocomments($event)
-  $lj->Getprop_picture_keyword($event)
-  $lj->Getprop_noemail($event)
-  $lj->Getprop_unknown8bit($event)
+C<LJ::Simple> is an object based C<perl> module which is used to access
+LiveJournal-based web logs. This module implements most of the
+flat protocol LiveJournal uses; for details of this protocol please
+see: L<http://www.livejournal.com/developer/protocol.bml>
 
 =head1 REQUIREMENTS
 
@@ -179,8 +49,8 @@ this module to work.
 
 =head1 DESCRIPTION
 
-LJ::Simple is a trival API to access LiveJournal. Currently all that it
-does is:
+C<LJ::Simple> is a trival API to access LiveJournal. Currently it
+allows you to:
 
 =over 2
 
@@ -207,9 +77,82 @@ Delete an existing post from the LiveJournal system
 
 =back
 
-Variables available are:
+=head1 EXAMPLE
+
+The following simple examples shows you how to use the module to post a
+simple LiveJournal entry.
+
+=head2 Using LJ::Simple::QuickPost()
+
+C<LJ::Simple::QuickPost()> is a routine which allows you to quickly post an entry into
+LiveJournal; as such it lacks a lot of the abilities which using the object-based
+interface provides. The C<LJ::Simple::QuickPost()> routine is explained in depth below, however
+the following example shows how it can be used to easily post to LiveJournal:
+
+  use LJ::Simple;
+  
+  LJ::Simple::QuickPost(
+	user	=>	"test",
+	pass	=>	"test",
+	entry	=>	"Just a simple entry",
+    ) || die "$0: Failed to post entry: $LJ::Simple::error\n";
+
+=head2 Using the standard calls
+
+  use LJ::Simple;
+
+  # Log into the server
+  my $lj = new LJ::Simple ({
+          user    =>      "test",
+          pass    =>      "test",
+          site    =>      undef,
+          proxy   =>      undef,
+        });
+  (defined $lj)
+    || die "$0: Failed to log into LiveJournal: $LJ::Simple::error\n";
+  
+  # Prepare the event
+  my %Event=();
+  $lj->NewEntry(\%Event) ||
+    die "$0: Failed to create new entry: $LJ::Simple::error\n";
+  
+  # Put in the entry
+  my $entry=<<EOF;
+  A simple entry made using <tt>LJ::Simple</tt> version $LJ::Simple::VERSION
+  EOF
+  $lj->SetEntry(\%Event,$entry)
+    || die "$0: Failed to set entry: $LJ::Simple::error\n";
+  
+  # Say we are happy
+  $lj->SetMood(\%Event,"happy")
+    || die "$0: Failed to set mood: $LJ::Simple::error\n";
+  
+  # Post the event
+  my ($item_id,$anum,$html_id)=$lj->PostEntry(\%Event);
+  (defined $item_id)
+    || die "$0: Failed to post journal entry: $LJ::Simple::error\n";
+
+=head1 VARIABLES
+
+There are various variables which can be used to control certain
+aspects of the module. It is generally recommended that if you
+wish to change these variables that you do so B<before> you
+create the initial object.
+
+The variable you are most likely to use is C<$LJ::Simple::error>
+which holds error messages if any of the C<LJ::Simple> calls
+fail.
 
 =over 4
+
+=item $LJ::Simple::error
+
+Holds error messages, is set with a blank string at the
+start of each method. Whilst the messages are relatively free-form,
+there are some prefixes which are sometimes used:
+
+  CODE:     An error in the code calling the API
+  INTERNAL: An internal error in this module
 
 =item $LJ::Simple::debug
 
@@ -249,19 +192,89 @@ The default is to see if we have the C<Digest::MD5> module available and if
 so we make use of the challenge-response system. This can be disabled by
 setting the variable to C<0>.
 
-=item $LJ::Simple::error
-
-Holds error messages, is set with a blank string at the
-start of each method. Whilst the messages are relatively free-form,
-there are some prefixes which are sometimes used:
-
-  CODE:     An error in the code calling the API
-  INTERNAL: An internal error in this module
-
 =item $LJ::Simple::timeout
 
 The time - specified in seconds - to wait for data from the server. If
 given a value of C<undef> the API will block until data is avaiable.
+
+=item $LJ::Simple::NonBlock
+
+By default this is set to C<undef>. When given a reference to a sub-routine this
+module will call the given sub-routine at various stages of processing the responses
+to the LiveJournal server. This is intended for GUI applications which need to process
+event queues, update progress bars, I<etc>. When called the sub-routine is passed a
+number of variables which maybe useful; the calling method is:
+
+  &{sub}($mode,$status,$action,$bytes_in,$bytes_out,$time,$waiting)
+
+    $mode      - The mode sent to the LJ server
+    $status    - The status of the request; ranges from 0 to 1
+    $action    - The action performed
+    $bytes_in  - The number of bytes read from the remote server
+    $bytes_out - The number of bytes written to the remote server
+    $time      - The time taken so far in seconds
+    $waiting   - Are we waiting for a response from the server ?
+
+It should be noted that if C<$waiting> is set to C<1> then it is B<highly> recommended
+that the sub-routine calls C<select()> itself to provide at least some time delay. If
+this is not done it is likely that this module will consume far more CPU than necessary.
+
+An example sub-routine follows:
+
+  sub LJStatus {
+    my ($mode,$status,$action,$bytes_in,$bytes_out,$time,$waiting) = @_;
+    print "\$mode      = $mode\n";
+    print "\$status    = $status\n";
+    print "\$action    = $action\n";
+    print "\$bytes_in  = $bytes_in\n";
+    print "\$bytes_out = $bytes_out\n";
+    print "\$time      = $time\n";
+    print "\$waiting   = $waiting\n";
+    print "\n";
+    ($waiting) && select(undef,undef,undef,0.5);
+  }
+  
+  $LJ::Simple::NonBlock=\&LJStatus;
+
+=item $LJ::Simple::ProtoSub
+
+By default this points to a sub-routine within the module; this is called when
+the protocol between the module and LiveJournal server is to be shown, in other
+words when C<$LJ::Simple::protocol> is set to C<1>. The sub-routine called must
+take two variables; it is called in the following way:
+
+  &{sub}($direction,$data,$server,$ip_addr)
+
+    $direction - The direction of the flow; 0 means from client to server
+                 and 1 means from server to client
+    $data      - The data which has flowed; there should not be any newlines
+                 with the data, but do not rely on this.
+    $server    - The name of the LJ server we are talking to
+    $ip_addr   - The IP address of the LJ server we are talking to
+
+If both variables are C<undef> then data is about to flow. If just C<$direction> is
+C<undef> then C<$data> holds an informational message.
+
+The standard sub-routine which is called is:
+
+  sub DefaultProtoSub {
+    my ($direct,$data,$server,$ip_addr)=@_;
+    my $arrow="--> ";
+    if (!defined $direct) {
+      if (!defined $data) {
+        print STDERR "Connecting to $server [$ip_addr]\n";
+        print STDERR "Lines starting with \"-->\" is data SENT to the server\n";
+        print STDERR "Lines starting with \"<--\" is data RECEIVED from the server\n";
+        return;
+      }
+      $arrow="";
+    } else {
+      ($direct) && ($arrow="<-- ");
+    }
+    print STDERR "$arrow$data\n";
+  }
+  
+  $LJ::Simple::ProtoSub=\&DefaultProtoSub;
 
 =item $LJ::Simple::buffer
 
@@ -271,17 +284,39 @@ The number of bytes to try and read in on each C<sysread()> call.
 
 =cut
 
+sub DefaultProtoSub {
+  my ($direct,$data,$server,$ip_addr)=@_;
+  my $arrow="--> ";
+  if (!defined $direct) {
+    if (!defined $data) {
+      print STDERR "Connecting to $server [$ip_addr]\n";
+      print STDERR "Lines starting with \"-->\" is data SENT to the server\n";
+      print STDERR "Lines starting with \"<--\" is data RECEIVED from the server\n";
+      return;
+    }
+    $arrow="";
+  } else {
+    ($direct) && ($arrow="<-- ");
+  }
+  print STDERR "$arrow$data\n";
+}
+
+
 ## Global variables - documented
 # Debug ?
 $LJ::Simple::debug=0;
 # Show protocol ?
 $LJ::Simple::protocol=0;
+# Protocol handling code
+$LJ::Simple::ProtoSub=\&DefaultProtoSub;
 # Show raw protocol ?
 $LJ::Simple::raw_protocol=0;
 # Use UTF-8 ?
 $LJ::Simple::UTF = undef;
 # Use challenge-response ?
 $LJ::Simple::challenge = undef;
+# Use non-block sub-routine
+$LJ::Simple::NonBlock = undef;
 # Errors
 $LJ::Simple::error="";
 # Timeout for reading from sockets - default is 5 minutes
@@ -289,17 +324,190 @@ $LJ::Simple::timeout = 300;
 # How much data to read from the socket in one read()
 $LJ::Simple::buffer = 8192;
 
+## Global variables - internal and undocumented
+# Should we not fully run the QuickPost routine ?
+$LJ::Simple::TestStopQuickPost = 0;
+
 =pod
 
-The actual methods available are:
+=head1 AVAILABLE METHODS
+
+=head2 LJ::Simple::QuickPost()
+
+C<LJ::Simple::QuickPost()> is a routine which allows you to quick post to LiveJournal.
+However it does this by hiding a lot of the details involved in using
+C<LJ::Simple> to do this. This routine will do all of the work involved in
+logging into the LiveJournal server, preparing the entry and then posting it.
+If at any stage there is a failure then C<0> is returned and C<$LJ::Simple::error>
+will contain the reason why. If the entry was successfully posted to the LiveJournal
+server then the routine will return C<1>.
+
+There are a number of options to the C<LJ::Simple::QuickPost()> routine:
+
+  LJ::Simple::QuickPost(
+	user	=>	Username
+	pass	=>	Password
+	entry	=>	Contents of the entry
+	subject	=>	Subject line of the entry
+	mood	=>	Current mood
+	music	=>	Current music
+	html	=>	HTML content ?
+	protect	=>	Security settings of the entry
+	groups	=>	Friends groups list
+  );
+
+Of these, only the C<user>, C<pass> and C<entry> options are required; all of the other
+options are optional. The option names are all case insensitive.
 
 =over 4
 
-=cut
+=item user
 
-## Global variables - internal and undocumented
+The username who owns the journal the entry should be posted to;
+this option is B<required>.
+
+=item pass
+
+The password of the C<user>;
+this option is B<required>.
+
+=item entry
+
+The actual entry itself.
+
+=item subject
+
+The subject line of the post.
+
+=item mood
+
+The mood to associate with the post; the value is given to the C<SetMood()> method
+for processing.
+
+=item music
+
+The music to associate with the post.
+
+=item html
+
+This is a boolean value of either C<1> or C<0>. If you want to say that the entry
+contains HTML and thus should be considered to be preformatted then set C<html> to
+C<1>. Otherwise you can either set it to C<0> or not give the option.
+
+=item protect
+
+By default the new entry will be public unless you give the C<protect> option. This
+option should be given the protection level required for the post and can be one of
+the following:
+
+  public  - The entry is public
+  friends - Entry is friends-only
+  groups  - Entry is restricted to friends groups
+  private - Entry is restricted to the journal's owner
+
+If you set the C<protect> option to C<groups> you must also include the C<groups>
+option - see below for details.
+
+=item groups
+
+If the C<protect> option is set to C<groups> then this option should contain a
+list reference which contains the list of groups the entry should be restricted to.
+This option is B<required> if the C<protect> option is set to C<groups>.
+
+=back
+
+Example code:
+
+  # Simple test post
+  LJ::Simple::QuickPost(
+	user	=>	"test",
+	pass	=>	"test",
+	entry	=>	"Just a simple entry",
+    ) || die "$0: Failed to post entry: $LJ::Simple::error\n";
+  
+  # A friends-only preformatted entry
+  LJ::Simple::QuickPost(
+	user	=>	"test",
+	pass	=>	"test",
+	entry	=>	"<p>Friends-only, preformatted, entry</p>",
+	html	=>	1,
+	protect	=>	"friends",
+    ) || die "$0: Failed to post entry: $LJ::Simple::error\n";
+  
+  # A entry restricted to several friends groups
+  LJ::Simple::QuickPost(
+	user	=>	"test",
+	pass	=>	"test",
+	entry	=>	"Entry limited to friends groups",
+	protect	=>	"groups",
+	groups	=>	[qw( one_group another_group )],
+    ) || die "$0: Failed to post entry: $LJ::Simple::error\n";
+
+=cut
+sub QuickPost(@) {
+  my %opts=();
+  my @prot_opts=();
+  while($#_>-1) {
+    my $k=lc(shift(@_));
+    my $v=shift(@_);
+    (defined $v) || next;
+    $opts{$k}=$v;
+  }
+  foreach (qw( user pass entry )) {
+    (exists $opts{$_}) && next;
+    $LJ::Simple::error="CODE: QuickPost() called without the required $_ option";
+    return 0;
+  }
+  if ((exists $opts{html}) && ($opts{html}!~/^[01]$/)) {
+    $LJ::Simple::error="CODE: QuickPost() not given either 0 or 1 for html option";
+    return 0;
+  }
+  if ((exists $opts{protect}) && ($opts{protect} eq "groups")) {
+    if (!exists $opts{groups}) {
+      $LJ::Simple::error="CODE: QuickPost() given protect=groups, but no groups option";
+      return 0;
+    }
+    if (ref($opts{groups}) ne "ARRAY") {
+      $LJ::Simple::error="CODE: QuickPost() not given a list reference for the groups option";
+      return 0;
+    }
+    @prot_opts=@{$opts{groups}};
+  }
+
+  # Kludge so we can test the input validation
+  ($LJ::Simple::TestStopQuickPost) && return 1;
+  
+  my $lj = new LJ::Simple({
+	user	=>	$opts{user},
+	pass	=>	$opts{pass},
+  });
+  (defined $lj) || return 0;
+
+  my %Event=();
+  $lj->NewEntry(\%Event) || return 0;
+  $lj->SetEntry(\%Event,$opts{entry}) || return 0;
+  (exists $opts{subject}) &&
+    ($lj->(\%Event,$opts{subject}) || return 0);
+  (exists $opts{mood}) &&
+    ($lj->SetMood(\%Event,$opts{mood}) || return 0);
+  (exists $opts{music}) &&
+    ($lj->Setprop_current_music(\%Event,$opts{music}) || return 0);
+  (exists $opts{html}) &&
+    ($lj->Setprop_preformatted(\%Event,$opts{html}) || return 0);
+  (exists $opts{protect}) &&
+    ($lj->SetProtect(\%Event,$opts{protect},@prot_opts) || return 0);
+
+  my ($item_id,$anum,$html_id)=$lj->PostEntry(\%Event);
+  (defined $item_id) || return 0;
+
+  return 1;
+}
 
 =pod
+
+=head2 Object creation
+
+=over 4
 
 =item login
 
@@ -701,6 +909,12 @@ sub login($$) {
 
 =pod
 
+=back
+
+=head2 Getting data from the LiveJournal login
+
+=over 4
+
 =item $lj->message()
 
 Returns back a message set in the LiveJournal system. Either
@@ -1071,6 +1285,12 @@ sub fastserver($) {
 }
 
 =pod
+
+=back
+
+=head2 Dealing with friends
+
+=over 4
 
 =item $lj->GetFriendOf()
 
@@ -1526,6 +1746,12 @@ sub GetFriendGroups($$) {
 
 =pod
 
+=back
+
+=head2 The creation and editing of entries
+
+=over 4
+
 =item $lj->NewEntry($event)
 
 Prepares for a new journal entry to be sent into the LiveJournal system.
@@ -1852,6 +2078,75 @@ sub AddToEntry($$@) {
 
 =pod
 
+=back
+
+=head2 Setting of journal entry security levels
+
+=over 4
+
+=item $lj->SetProtect($event,$type,@args)
+
+A wrapper function which calls the underlying C<SetProtect*()> routines
+for the caller. This takes two or more arguments; the first argument is
+the hash reference of the current event. The second argument is the
+type of security we are setting. Subsequent arguments are related to
+the security type. Available types and their arguments are:
+
+  +---------+------------------+------------------------------------+
+  |  Type   | Additional args  | Security                           |
+  +---------+------------------+------------------------------------+
+  | public  |      None        | Public - the default               |
+  | friends |      None        | Friends only                       |
+  | groups  | A list of groups | Restricted to groups of friends    |
+  | private |      None        | Private - only the user can access |
+  +---------+------------------+------------------------------------+
+
+On success this routine returns C<1>; otherwise it returns C<0> and
+sets C<$LJ::Simple::error> to the reason why.
+
+Example code:
+
+  ## Make entry public (the default)
+  $lj->SetProtect(\%Event,"public")
+    || die "$0: Failed to make entry public - $LJ::Simple::error\n";
+  
+  ## Make entry friends only
+  $lj->SetProtect(\%Event,"friends")
+    || die "$0: Failed to make entry friends only - $LJ::Simple::error\n";
+  
+  ## Make entry only readable by friends in the groups "close" and "others"
+  $lj->SetProtect(\%Event,"groups","close","others")
+    || die "$0: Failed to make entry public - $LJ::Simple::error\n";
+  
+  ## Make entry private so only the journal owner can view it
+  $lj->SetProtect(\%Event,"private")
+    || die "$0: Failed to make entry private - $LJ::Simple::error\n";
+
+=cut
+sub SetProtect($$$@) {
+  my $self=shift;
+  my ($event,$type,@args)=@_;
+  $LJ::Simple::error="";
+  if (ref($event) ne "HASH") {
+    $LJ::Simple::error="CODE: Not given a hash reference";
+    return 0;
+  }
+  if ($type eq "public") {
+    return $self->SetProtectPublic($event);
+  } elsif ($type eq "friends") {
+    return $self->SetProtectFriends($event);
+  } elsif ($type eq "groups") {
+    return $self->SetProtectGroups($event,@args);
+  } elsif ($type eq "private") {
+    return $self->SetProtectPrivate($event);
+  } else {
+    $LJ::Simple::error="CODE: type \"$type\" not recognised by SetProtect()";
+    return 0;
+  }
+};
+
+=pod
+
 =item $lj->SetProtectPublic($event)
 
 Sets the current post so that anyone can read the journal entry. Note that this
@@ -2020,6 +2315,12 @@ sub Setprop_general($$$$$$) {
 }
 
 =pod
+
+=back
+
+=head2 Setting journal entry properties
+
+=over 4
 
 =item $lj->Setprop_backdate($event,$onoff)
 
@@ -2260,6 +2561,12 @@ sub Setprop_unknown8bit($$$) {
 
 =pod
 
+=back
+
+=head2 Posting, editing and deleting journal entries
+
+=over 4
+
 =item $lj->PostEntry($event)
 
 Submit a journal entry into the LiveJournal system. This requires you to have
@@ -2431,6 +2738,12 @@ sub DeleteEntry($$) {
 }
 
 =pod
+
+=back
+
+=head2 Retriving journal entries
+
+=over 4
 
 =item $lj->SyncItems($timestamp)
 
@@ -2628,7 +2941,9 @@ C<EditEntry()>. The most sensible way to access this hash is to use the various
 C<Get*()> routines.
 
 The second argument - C<$journal> - is an optional argument set if the journal
-to be accessed is a shared journal. If not required set this to C<undef>.
+to be accessed is a shared journal. If this is set then the name of shared journal
+will be propogated into the entries returned in the hash reference C<$hash_ref> as
+if C<$lj->UseJournal($event,$journal)> was called. If not required set this to C<undef>.
 
 The third argument - C<$type> - specifies how the journal entries are to be
 pulled down. The contents of the fourth argument - C<@opt> - will depend on the
@@ -2658,6 +2973,9 @@ value in the C<$type> variable. Thus:
   |       |            | timestamp.                               |
   +-------+------------+------------------------------------------+
 
+If the operation is successful then C<$hash_ref> is returned. On failure
+C<undef> is returned and C<$LJ::Simple::error> is updated with the
+reason for the error.
 
 Example code:
 
@@ -2906,6 +3224,7 @@ sub GetEntries($$@) {
       event		=>	$ehr->{event},
       lineenddings	=>	"unix",
     );
+    (defined $journal) && ($nhr->{usejournal}=$journal);
     (exists $ehr->{subject}) && ($nhr->{subject}=$ehr->{subject});
     (exists $ehr->{allowmask}) && ($nhr->{allowmask}=$ehr->{allowmask});
     (exists $ehr->{security}) && ($nhr->{security}=$ehr->{security});
@@ -2942,6 +3261,12 @@ sub GetEntries($$@) {
 }
 
 =pod 
+
+=back
+
+=head2 Getting information from an entry
+
+=over 4
 
 =item $lj->GetDate($event)
 
@@ -3483,6 +3808,15 @@ sub DecVal($) {
 sub SendRequest($$$$) {
   my ($self,$mode,$args,$req_hash)=@_;
   $LJ::Simple::error="";
+  my $sub=$LJ::Simple::NonBlock;
+  my $bytes_in=0;
+  my $bytes_out=0;
+  my $timestart=time();
+  if ((defined $sub) && (ref($sub) ne "CODE")) { 
+    my $reftype=ref($sub);
+    $LJ::Simple::error="\$LJ::Simple::NonBlock given a $reftype reference, not CODE";
+    return 0;
+  }
   $self->{request}={};
   if ((ref($args) ne "HASH")&&($mode ne "getchallenge")) {
     $LJ::Simple::error="INTERNAL: SendRequest() not given hashref for arguments";
@@ -3551,6 +3885,7 @@ sub SendRequest($$$$) {
 	"ver=$ljprotver",
     );
   }
+  (defined $sub) && &{$sub}($mode,0.1,"Preparing request data",$bytes_in,$bytes_out,time()-$timestart,0);
   if ($mode eq "login") {
     push(@request,EncVal("clientversion","Perl-LJ::Simple/$VERSION"));
     if ((exists $args->{moods}) && ($args->{moods} == 1)) {
@@ -3593,6 +3928,8 @@ sub SendRequest($$$$) {
   my $req=join("&",@request);
   my $ContLen=length($req);
 
+  (defined $sub) && &{$sub}($mode,0.2,"Preparing connection to server",$bytes_in,$bytes_out,time()-$timestart,0);
+
   ## Now we've got the request ready, time to start talking to the web
   # Work out where we're talking to and the URI to do it with
   my $server=$self->{lj}->{host};
@@ -3610,6 +3947,7 @@ sub SendRequest($$$$) {
 	"POST $uri HTTP/1.0",
 	"Host: $host",
 	"Content-type: application/x-www-form-urlencoded",
+	"User-Agent: LJ::Simple/$VERSION; http://www.bpfh.net/computing/software/LJ::Simple/; lj-simple\@bpfh.net",
 	"Content-length: $ContLen",
   );
   if ($self->{fastserver}) {
@@ -3622,10 +3960,11 @@ sub SendRequest($$$$) {
   );
 
   # Prepare the socket
-  my $proto=getprotobyname("tcp");
-  socket(SOCK,PF_INET,SOCK_STREAM,$proto);
+  my $tcp_proto=getprotobyname("tcp");
+  socket(SOCK,PF_INET,SOCK_STREAM,$tcp_proto);
 
   # Resolve the server name we're connecting to
+  (defined $sub) && &{$sub}($mode,0.3,"Starting to resolve $server to IP address",$bytes_in,$bytes_out,time()-$timestart,0);
   my $addr=inet_aton($server);
   if (!defined $addr) {
     $LJ::Simple::error="Failed to resolve server $server";
@@ -3635,22 +3974,28 @@ sub SendRequest($$$$) {
 
   my $ip_addr=join(".",unpack("CCCC",$addr));
 
-  if (($LJ::Simple::protocol)||($LJ::Simple::raw_protocol)) {
+  my $proto=$LJ::Simple::ProtoSub;
+  ($LJ::Simple::protocol) && &{$proto}(undef,undef,$server,$ip_addr);
+  if ($LJ::Simple::raw_protocol) {
     print STDERR "Connecting to $server [$ip_addr]\n";
     print STDERR "Lines starting with \"-->\" is data SENT to the server\n";
     print STDERR "Lines starting with \"<--\" is data RECEIVED from the server\n";
   }
 
   # Connect to the server
+  (defined $sub) && &{$sub}($mode,0.4,"Trying to connect to server $server",$bytes_in,$bytes_out,time()-$timestart,0);
   if (!connect(SOCK,$sin)) {
     $LJ::Simple::error="Failed to connect to $server - $!";
     return 0;
   }
 
-  (($LJ::Simple::protocol)||($LJ::Simple::raw_protocol)) &&
+  ($LJ::Simple::protocol) && &{$proto}(undef,"Connected to $server [$ip_addr]",$server,$ip_addr);
+  ($LJ::Simple::raw_protocol) &&
      print STDERR "Connected to $server [$ip_addr]\n";
 
   # Send the HTTP request
+  (defined $sub) && &{$sub}($mode,0.5,"Starting to send HTTP request to $server",$bytes_in,$bytes_out,time()-$timestart,0);
+  my $cp=0.5;
   foreach (@HTTP) {
     my $line="$_\r\n";
     my $len=length($line);
@@ -3676,24 +4021,46 @@ sub SendRequest($$$$) {
         }
       }
       $pos+=$nbytes;
+      $bytes_out+=$nbytes;
+      $cp=$cp+0.001;
+      (defined $sub) && &{$sub}($mode,$cp,"Sending HTTP request to $server",$bytes_in,$bytes_out,time()-$timestart,0);
     }
-    (($LJ::Simple::protocol)||($LJ::Simple::raw_protocol)) &&
-      print STDERR "--> $_\n";
+    ($LJ::Simple::protocol) && &{$proto}(0,$_,$server,$ip_addr);
+    ($LJ::Simple::raw_protocol) && print STDERR "--> $_\n";
   }
 
   # Read the response from the server - use select()
+  (defined $sub) && &{$sub}($mode,0.6,"Getting HTTP response from $server",$bytes_in,$bytes_out,time()-$timestart,0);
+  $cp=0.6001;
   my ($rin,$rout,$eout)=("","","");
   vec($rin,fileno(SOCK),1) = 1;
   my $ein = $rin;
   my $response="";
   my $done=0;
   while (!$done) {
-    my $nfound = select($rout=$rin,undef,$eout=$ein,$LJ::Simple::timeout);
-    if ($nfound!=1) {
-      $LJ::Simple::error="Failed to receive data from $server [$ip_addr]";
-      shutdown(SOCK,2);
-      close(SOCK);
-      return 0;
+    my $nfound;
+    if (defined $sub) {
+      $nfound = select($rout=$rin,undef,$eout=$ein,0);
+      my $ttaken=time()-$timestart;
+      if ($nfound!=1) {
+        if ($ttaken>$LJ::Simple::timeout) {
+          &{$sub}($mode,1,"Connection with server $server timed out",$bytes_in,$bytes_out,$ttaken,0);
+          $LJ::Simple::error="Failed to receive data from $server [$ip_addr]";
+          shutdown(SOCK,2);
+          close(SOCK);
+          return 0;
+        }
+        &{$sub}($mode,$cp,"Waiting for response from $server",$bytes_in,$bytes_out,time()-$timestart,1);
+        next;
+      }
+    } else {
+      $nfound = select($rout=$rin,undef,$eout=$ein,$LJ::Simple::timeout);
+      if ($nfound!=1) {
+        $LJ::Simple::error="Failed to receive data from $server [$ip_addr]";
+        shutdown(SOCK,2);
+        close(SOCK);
+        return 0;
+      }
     }
     my $resp="";
     my $nbytes=sysread(SOCK,$resp,$LJ::Simple::buffer);
@@ -3701,10 +4068,14 @@ sub SendRequest($$$$) {
       $LJ::Simple::error="Error in getting data from $server [$ip_addr] - $!";
       shutdown(SOCK,2);
       close(SOCK);
+      (defined $sub) && &{$sub}($mode,1,$LJ::Simple::error,$bytes_in,$bytes_out,time()-$timestart,0);
       return 0;
     } elsif ($nbytes==0) {
       $done=1;
-    } else {
+    } else { 
+      $bytes_in=$bytes_in+$nbytes;
+      (defined $sub) && &{$sub}($mode,$cp,"Getting response from server $server",$bytes_in,$bytes_out,time()-$timestart,0);
+      $cp=$cp+0.001;
       $resp=~s/\r//go;
       $response=join("",$response,$resp);
       if ($LJ::Simple::raw_protocol) {
@@ -3716,21 +4087,24 @@ sub SendRequest($$$$) {
         print STDERR "\n";
       } elsif ($LJ::Simple::protocol) {
         foreach (split(/\n/,$resp)) {
-          print STDERR "<-- $_\n";
+          &{$proto}(1,$_,$server,$ip_addr);
         }
       }
     }
   }
+  (defined $sub) && &{$sub}($mode,0.7,"Finished getting data from server $server",$bytes_in,$bytes_out,time()-$timestart,0);
   
   # Shutdown the socket
   if (!shutdown(SOCK,2)) {
     $LJ::Simple::error="Failed to shutdown socket - $!";
+    (defined $sub) && &{$sub}($mode,1,$LJ::Simple::error,$bytes_in,$bytes_out,time()-$timestart,0);
     return 0;
   }
 
   # Close the socket
   close(SOCK);
 
+  (defined $sub) && &{$sub}($mode,0.8,"Parsing data from server $server",$bytes_in,$bytes_out,time()-$timestart,0);
   ## We've got the response from the server, so we now parse it
   if (!defined $response) {
     $LJ::Simple::error="Failed to get result from server";
@@ -3740,6 +4114,7 @@ sub SendRequest($$$$) {
   ## Ensure that response isn't zero length
   if (length($response) == 0) {
     $LJ::Simple::error="Zero length response from server";
+    (defined $sub) && &{$sub}($mode,1,"$LJ::Simple::error $server",$bytes_in,$bytes_out,time()-$timestart,0);
     return 0;
   }
 
@@ -3748,10 +4123,12 @@ sub SendRequest($$$$) {
 
   if (!defined $http) {
     $LJ::Simple::error="Failed to get HTTP headers from server";
+    (defined $sub) && &{$sub}($mode,1,"$LJ::Simple::error $server",$bytes_in,$bytes_out,time()-$timestart,0);
     return 0;
   }
   if (!defined $body) {
     $LJ::Simple::error="Failed to get HTTP body from server";
+    (defined $sub) && &{$sub}($mode,1,"$LJ::Simple::error $server",$bytes_in,$bytes_out,time()-$timestart,0);
     return 0;
   }
 
@@ -3793,6 +4170,7 @@ sub SendRequest($$$$) {
       $errmsg=$self->{request}->{lj}->{errmsg};
     }
     $LJ::Simple::error="LJ request failed: $errmsg";
+    (defined $sub) && &{$sub}($mode,1,"$LJ::Simple::error $server",$bytes_in,$bytes_out,time()-$timestart,0);
     return 0;
   }
 
@@ -3806,6 +4184,7 @@ sub SendRequest($$$$) {
     }
   }
 
+  (defined $sub) && &{$sub}($mode,1,"Finished processing request to server $server",$bytes_in,$bytes_out,time()-$timestart,0);
   return 1;
 }
 
@@ -3897,48 +4276,6 @@ __END__
 
 =back
 
-=head1 EXAMPLE
-
-The following simple example logs into the LiveJournal server and
-posts a simple comment.
-
-  use LJ::Simple;
-
-  # Log into the server
-  my $lj = new LJ::Simple ({
-          user    =>      "test",
-          pass    =>      "test",
-          site    =>      undef,
-          proxy   =>      undef,
-        });
-  (defined $lj)
-    || die "$0: Failed to log into LiveJournal: $LJ::Simple::error\n";
-  
-  # Prepare the event
-  my %Event=();
-  $lj->NewEntry(\%Event) ||
-    die "$0: Failed to create new entry: $LJ::Simple::error\n";
-  
-  # Put in the entry
-  my $entry=<<EOF;
-  A simple entry made using <tt>LJ::Simple</tt> version $LJ::Simple::VERSION
-  EOF
-  $lj->SetEntry(\%Event,$entry)
-    || die "$0: Failed to set entry: $LJ::Simple::error\n";
-  
-  # Say we are happy
-  $lj->SetMood(\%Event,"happy")
-    || die "$0: Failed to set mood: $LJ::Simple::error\n";
-  
-  # Don't allow comments
-  # Note that to allow comments you can just remove this call to
-  # Setprop_nocomments() completely - the default is to allow comments.
-  $lj->Setprop_nocomments(\%Event,1);
-  
-  my ($item_id,$anum,$html_id)=$lj->PostEntry(\%Event);
-  (defined $item_id)
-    || die "$0: Failed to post journal entry: $LJ::Simple::error\n";
-  
 =head1 AUTHOR
 
 Simon Burr E<lt>simes@bpfh.netE<gt>
@@ -3946,6 +4283,7 @@ Simon Burr E<lt>simes@bpfh.netE<gt>
 =head1 SEE ALSO
 
 perl
+L<http://www.livejournal.com/>
 
 =head1 LICENSE
 

@@ -7,3 +7,4 @@ test.pl
 examples/README
 examples/ljpost
 examples/friends-only
+META.yml                                 Module meta-data (added by MakeMaker)

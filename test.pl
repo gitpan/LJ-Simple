@@ -15,13 +15,42 @@
 
 #########################
 use Test;
-BEGIN { plan tests => 26 };
+BEGIN { plan tests => 35 };
 use LJ::Simple;
 ok(1); # If we made it this far, we're ok.
 #########################
 
 my $user="test";
 my $pass="test";
+
+$LJ::Simple::TestStopQuickPost = 1;
+if (LJ::Simple::QuickPost() == 0) { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost( user ) == 0) { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost( user => $user ) == 0) { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost( user => $user, pass => $pass, entry => "foo" ) == 1)
+ { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost(
+		user => $user, pass => $pass, entry => "foo",
+                html => "foo"
+    ) == 0) { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost(
+		user => $user, pass => $pass, entry => "foo",
+                html => 1,
+    ) == 1) { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost(
+		user => $user, pass => $pass, entry => "foo",
+                protect => "groups",
+    ) == 0) { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost(
+		user => $user, pass => $pass, entry => "foo",
+                protect => "groups",
+		groups => "foo",
+    ) == 0) { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost(
+		user => $user, pass => $pass, entry => "foo",
+                protect => "groups",
+		groups => [],
+    ) == 1) { ok(1) } else { ok(0) }
 
 #goto LOGIN;
 
@@ -152,7 +181,7 @@ if (!$lj->SetProtectGroups(\%Ref,"group")) {
 if (!defined $lj->message()) {ok(1)} else {ok(0)}
 
 
-LOGIN:
+LOGIN:;
 
 ## Test object creation with a valid username and password
 $lj = new LJ::Simple ({
@@ -341,7 +370,7 @@ if (!$lj->AddToEntry(\%Event,@stuff)) {
   if ($Event{event} eq join("\n",@ts)) { ok(1) } else { ok(0) }
 }
 
-JTEST1:
+JTEST:
 
 ## Now re-create an entry
 if (!$lj->NewEntry(\%Event)) {
@@ -352,9 +381,6 @@ if (!$lj->NewEntry(\%Event)) {
 
 my $entry=<<EOF;
 Test of <tt>LJ::Simple</tt> version $LJ::Simple::VERSION
-Meek
-Moo
-Bar
 EOF
 if (!$lj->SetEntry(\%Event,$entry)) { ok(0) } else { ok(1) }
 
@@ -445,7 +471,6 @@ if (defined $lj->GetEntries(\%GE_hr,undef,"lastn",undef,time()+800)) {
   ok(0); print "  Error was: $LJ::Simple::error\n";
 }
 
-JTEST2:
 
 my %Entry=();
 # one, just our latest entry
@@ -474,8 +499,6 @@ if ($lj->EditEntry($event)) {
   print STDERR "  Error was: $LJ::Simple::error\n";
 }
 
-#goto JTEST;
-
 # Get entry again & compare
 if (defined $lj->GetEntries(\%Entry,undef,"one",$item_id)) {
   if (exists $Entry{$item_id}) {ok(1)} else {ok(0)}
@@ -487,6 +510,6 @@ if ($NewText eq $lj->GetEntry($Entry{$item_id})) { ok(1) } else { ok(0) }
 ## Be nice and remove the test entry
 if (!$lj->DeleteEntry($item_id)) { ok(0) } else { ok(1) }
 
-JTEST:
+JTEST2:
 
 exit 0;

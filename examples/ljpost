@@ -4,7 +4,7 @@
 ## It pulls details from the .livejournal file or ask the
 ## user for the auth details if that is not present.
 ##
-##  $Id: ljpost,v 1.3 2004/03/20 22:11:55 simes Exp $
+##  $Id: ljpost,v 1.5 2004/05/20 16:31:23 simes Exp $
 ##
 
 use strict;				# Silly not to be
@@ -126,7 +126,8 @@ $lj->NewEntry(\%Event) ||
   die "$0: Failed to prepare event - $LJ::Simple::error\n";
 
 my $TxtTimeT=$^T;
-my $TxtTime=strftime("%Y%m%d",localtime($TxtTimeT));
+my @LocTime=localtime($TxtTimeT);
+my $TxtTime=strftime("%Y%m%d",@LocTime);
 my $done=0;
 my ($mins,$hrs,$dy,$mn,$yr);
 while (!$done) {
@@ -143,7 +144,7 @@ while (!$done) {
     $done=1;
   }
 }
-$TxtTime=strftime("%H:%M",localtime($TxtTimeT));
+$TxtTime=strftime("%H:%M",@LocTime);
 $done=0;
 while (!$done) {
   print STDERR "Time of entry [$TxtTime]: ";
@@ -160,7 +161,7 @@ while (!$done) {
   }
 }
 
-$TxtTimeT=mktime(0,$mins,$hrs,$dy,$mn,$yr);
+$TxtTimeT=mktime(0,$mins,$hrs,$dy,$mn,$yr,0,0,$LocTime[8]);
 
 $lj->SetDate(\%Event,$TxtTimeT);
 
@@ -244,8 +245,77 @@ print STDERR "  $link\n";
 
 exit 0;
 
+=pod
+
+=head1 NAME
+
+ljpost - command line interface to post messages to LiveJournal
+
+=head1 SYNOPSIS
+
+B<ljpost>
+[B<file>]
+
+=head1 OPTIONS
+
+C<ljpost> only takes an optional file which holds the contents of the post;
+if this is not given then the editor in C<$EDITOR> is invoked instead.
+
+=head1 DESCRIPTION
+
+C<ljpost> is a simple command line interface to posting entries to LiveJournal.
+Currently it supports the following features:
+
+ o Setting date of entry
+ o Setting subject of entry
+ o Setting mood of entry
+ o Setting music of entry
+ o The user icon associated with the entry
+ o If the entry is auto-formated or not
+ o Set security levels of the entry; can be public, private,
+   friends-only or limited by friends groups
+  
+
+When the post has been made the URL where the post can be found. C<ljpost>
+can pull the LiveJournal username and password from a file -
+C<$HOME/.livejournal> The format of this file is simple; based on key/value
+pairs. Blank lines and lines starting with a C<#> are ignored. Otherwise
+there are two available keys C<User> and C<Pass>. These are separated from
+their values by C<=> signs. For example:
+
+  ##
+  ## Test entry
+  ##
+  User = test
+  Pass = test
+
+It should be noted that if either of the username or password values are not
+present then the user will be prompted for the values to use.
+
+=head1 FILES
+
+$HOME/.livejournal - Holds LiveJournal authentication details
+
+=head1 SEE ALSO
+
+LJ::Simple,
+perl(1),
+LiveJournal - http://www.livejournal.com/
+
+=head1 AUTHOR
+
+Simon Burr E<lt>F<simes@bpfh.net>E<gt>
+
+=cut
+
 ##
 ## $Log: ljpost,v $
+## Revision 1.5  2004/05/20 16:31:23  simes
+## Fixed timezone issue in ljpost
+##
+## Revision 1.4  2004/05/20 15:41:20  simes
+## Bump to 0.12, added ljpost docs and now ljpost gets installed in the Solaris package
+##
 ## Revision 1.3  2004/03/20 22:11:55  simes
 ## Added setting of security bits
 ##

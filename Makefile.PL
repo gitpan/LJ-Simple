@@ -45,6 +45,13 @@ version:
 ## as well
 ##
 pkg: rebuild-pkg version manifypods pure_all
+	umask 022 ; \\
+	mkdir -p InstallPackage/build/usr/local/bin ; \\
+	mkdir -p InstallPackage/build/usr/local/man/man1 ; \\
+	cp examples/ljpost InstallPackage/build/usr/local/bin ; \\
+	chmod 755 InstallPackage/build/usr/local/bin/ljpost ; \\
+	pod2man examples/ljpost > InstallPackage/build/usr/local/man/man1/ljpost.1 ; \\
+	chmod 644 InstallPackage/build/usr/local/man/man1/ljpost.1
 	build-pkg -n %PKG%-v%VERSION%.pkg -K
 	mv InstallPackage/*.pkg .
 
