@@ -9,7 +9,7 @@ require AutoLoader;
 @ISA = qw(Exporter AutoLoader);
 @EXPORT_OK = qw();
 @EXPORT = qw();
-$VERSION = '0.08';
+$VERSION = '0.09';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -35,7 +35,8 @@ LJ::Simple - Simple Perl to access LiveJournal
   use LJ::Simple;
 
   ## Variables - defaults are shown and normally you'll
-  ## not have to set any of the following.
+  ## not have to set any of the following. See below for
+  ## full details of these variables.
 
   # Do we show debug info ?
   $LJ::Simple::debug = 0;
@@ -44,7 +45,10 @@ LJ::Simple - Simple Perl to access LiveJournal
   $LJ::Simple::protocol = 0;
 
   # Do we use version 1 of the LJ protocol and thus support UTF-8 ?
-  $LJ::Simple::UTF = 0;
+  $LJ::Simple::UTF = undef;
+
+  # Do we use the challenge-response system ?
+  $LJ::Simple::challenge = undef;
 
   # Where error messages are placed
   $LJ::Simple::error = "";
@@ -205,16 +209,30 @@ Variables available are:
 
 =item $LJ::Simple::debug
 
-If set to 1, debugging messages are sent to stderr. 
+If set to C<1>, debugging messages are sent to stderr. 
 
 =item $LJ::Simple::protocol
 
-If set to 1 the protocol used to talk to the remote server is sent to stderr.
+If set to C<1> the protocol used to talk to the remote server is sent to stderr.
 
 =item $LJ::Simple::UTF
 
-If set to 1 the LiveJournal server is told to expect UTF-8 encoded characters.
+If set to C<1> the LiveJournal server is told to expect UTF-8 encoded characters.
 If you enable this the module will attempt to use the utf8 perl module.
+
+The default is see if we have a version of Perl with UTF-8 support and use
+it if its available.
+
+=item $LJ::Simple::challenge
+
+If set to C<1> we make use of the challenge-response system instead of using
+plain or hashed passwords. This does add some overhead into processing requests
+since every action has to be preceeded by a request for a challenge value from
+the server.
+
+The default is to see if we have the C<Digest::MD5> module available and if
+so we make use of the challenge-response system. This can be disabled by
+setting the variable to C<0>.
 
 =item $LJ::Simple::error
 
@@ -244,7 +262,9 @@ $LJ::Simple::debug=0;
 # Show protocol ?
 $LJ::Simple::protocol=0;
 # Use UTF-8 ?
-$LJ::Simple::UTF = 0;
+$LJ::Simple::UTF = undef;
+# Use challenge-response ?
+$LJ::Simple::challenge = undef;
 # Errors
 $LJ::Simple::error="";
 # Timeout for reading from sockets - default is 5 minutes
@@ -441,10 +461,20 @@ sub login($$) {
     return undef;
   }
   $self->{auth}={
-	user	=>	$hr->{user},
-	pass	=>	$hr->{pass},
+	user		=>	$hr->{user},
+	pass		=>	$hr->{pass},
+	challenge	=>	{},
   };
-  if ($LJ::Simple::UTF) {
+  if (! defined $LJ::Simple::UTF) {
+    eval { require utf8 };
+    if (!$@) {
+      $LJ::Simple::UTF=1;
+      Debug("UTF-8 support found");
+    } else {
+      $LJ::Simple::UTF=0;
+      Debug("No UTF-8 support found");
+    }
+  } elsif ($LJ::Simple::UTF) {
     eval { require utf8 };
     if (!$@) {
       Debug("Using UTF-8 as requested");
@@ -460,6 +490,13 @@ sub login($$) {
     $md5->add($hr->{pass});
     $self->{auth}->{hash}=$md5->hexdigest;
     delete $self->{auth}->{pass};
+    (!defined $LJ::Simple::challenge) && ($LJ::Simple::challenge=1);
+  } else {
+    if ((defined $LJ::Simple::challenge)&&($LJ::Simple::challenge)) {
+      $LJ::Simple::error="Challenge-response auth requested, no Digest::MD5 found";
+      return undef;
+    }
+    $LJ::Simple::challenge=0;
   }
   if ((exists $hr->{site})&&(defined $hr->{site})&&($hr->{site} ne "")) {
     my $site_port=80;
@@ -3399,7 +3436,7 @@ sub SendRequest($$$$) {
   my ($self,$mode,$args,$req_hash)=@_;
   $LJ::Simple::error="";
   $self->{request}={};
-  if (ref($args) ne "HASH") {
+  if ((ref($args) ne "HASH")&&($mode ne "getchallenge")) {
     $LJ::Simple::error="INTERNAL: SendRequest() not given hashref for arguments";
     return 0;
   }
@@ -3410,18 +3447,62 @@ sub SendRequest($$$$) {
   $mode=lc($mode);
   my @request=(
 	"mode=$mode",
-	EncVal("user",$self->{auth}->{user}),
   );
-  if (exists $self->{auth}->{hash}) {
-    push(@request,EncVal("hpassword",$self->{auth}->{hash}));
-  } else {
-    push(@request,EncVal("password",$self->{auth}->{pass}));
-  }
-  my $ljprotver=0;
-  if ($LJ::Simple::UTF) { $ljprotver=1; }
-  push(@request,
+  if ($mode ne "getchallenge") {
+    push(@request,
+		EncVal("user",$self->{auth}->{user}),
+	);
+    # Much fun here - see if we use the challenge-response stuff
+    if ($LJ::Simple::challenge) {
+      Debug("Trying to use challenge-response system");
+      Debug("  Getting new challenge");
+      my %chall=();
+      $self->SendRequest("getchallenge",undef,\%chall) || return 0;
+      if ($chall{auth_scheme} ne "c0") {
+        $LJ::Simple::error="Server returned unsupported auth_scheme \"$chall{auth_scheme}\"";
+        return 0;
+      }
+      Debug("    Got challenge from server:");
+      Debug("        challenge: $chall{challenge}");
+      Debug("      expire_time: $chall{expire_time}");
+      Debug("      server_time: $chall{server_time}");
+
+      # Work out our own timeout point, basically the livetime of the
+      # challenge less 10 seconds of fudge factor.
+      my $chall_livetime=$chall{expire_time} - $chall{server_time} - 10;
+      my $ctime=time();
+      $self->{auth}->{challenge}->{timeout}=$ctime + $chall_livetime;
+      Debug("    Challenge lifetime is $chall_livetime seconds");
+      Debug("      Current: $ctime");
+      Debug("       Expire: $self->{auth}->{challenge}->{timeout}");
+
+      $self->{auth}->{challenge}->{challenge}=$chall{challenge};
+      # We assume that the Digest::MD5 module is loaded already; also
+      # means that we have an MD5 hash of the password to hand.
+      my $md5=Digest::MD5->new;
+      $md5->add($chall{challenge});
+      $md5->add($self->{auth}->{hash});
+      $self->{auth}->{challenge}->{hash}=$md5->hexdigest;
+    }
+    if (exists $self->{auth}->{challenge}->{hash}) {
+      push(@request,
+		EncVal("auth_method","challenge"),
+		EncVal("auth_challenge",$self->{auth}->{challenge}->{challenge}),
+		EncVal("auth_response",$self->{auth}->{challenge}->{hash}),
+	);
+    } else {
+      if (exists $self->{auth}->{hash}) {
+        push(@request,EncVal("hpassword",$self->{auth}->{hash}));
+      } else {
+        push(@request,EncVal("password",$self->{auth}->{pass}));
+      }
+    }
+    my $ljprotver=0;
+    if ($LJ::Simple::UTF) { $ljprotver=1; }
+    push(@request,
 	"ver=$ljprotver",
-  );
+    );
+  }
   if ($mode eq "login") {
     push(@request,EncVal("clientversion","Perl-LJ::Simple/$VERSION"));
     if ((exists $args->{moods}) && ($args->{moods} == 1)) {
@@ -3455,6 +3536,8 @@ sub SendRequest($$$$) {
         push(@request,EncVal($k,$v));
       }
     }
+  } elsif ($mode eq "getchallenge") {
+    # NOP - nothing required
   } else {
     $LJ::Simple::error="INTERNAL: SendRequest() given unsupported mode \"$mode\"";
     return 0;

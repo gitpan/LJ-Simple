@@ -144,9 +144,10 @@ if (defined $lj) {
   ok(1);
 } else {
   ok(0);
+  print STDERR "  Error was: $LJ::Simple::error\n";
 }
 
-#goto JTEST;
+#goto JTEST1;
 
 my $msg=$lj->message();
 ok(1);
@@ -316,6 +317,8 @@ if (!$lj->AddToEntry(\%Event,@stuff)) {
   if ($Event{event} eq join("\n",@ts)) { ok(1) } else { ok(0) }
 }
 
+JTEST1:
+
 ## Now re-create an entry
 if (!$lj->NewEntry(\%Event)) {
   ok(0);
@@ -335,16 +338,17 @@ $lj->SetSubject(\%Event,"Test entry");
 $lj->SetMood(\%Event,"happy");
 $lj->Setprop_nocomments(\%Event,1);
 $lj->Setprop_backdate(\%Event,1);
-$lj->SetProtectFriends(\%Event);
 
 ## Finally fully test a post
 my ($item_id,$anum,$html_id)=$lj->PostEntry(\%Event);
 if (!defined $item_id) {
   ok(0);
+  print STDERR "  Error message: $LJ::Simple::error\n";
 } else {
   ok(1);
 }
 
+#goto JTEST2;
 
 my ($num_of_items,@lst)=$lj->SyncItems(time()-86400);
 if ((defined $num_of_items)&&($num_of_items>0)) {
@@ -417,25 +421,37 @@ if (defined $lj->GetEntries(\%GE_hr,undef,"lastn",undef,time()+800)) {
   ok(0); print "  Error was: $LJ::Simple::error\n";
 }
 
+JTEST2:
+
 my %Entry=();
 # one, just our latest entry
 if (defined $lj->GetEntries(\%Entry,undef,"one",$item_id)) {
   if (exists $Entry{$item_id}) {ok(1)} else {ok(0)}
 } else {
-  ok(0); print "  Error was: $LJ::Simple::error\n";
+  ok(0);
+  print "  Error was: $LJ::Simple::error\n";
 }
 # sync from yesturday
 if (defined $lj->GetEntries(\%GE_hr,undef,"sync",$^T-86400)) {
   if (exists $GE_hr{$item_id}) {ok(1)} else {ok(0)}
 } else {
   ok(0);
+  print "  Error was: $LJ::Simple::error\n";
 }
 
 # Edit the latest entry
 my $event=$Entry{$item_id};
 my $NewText="Foooooooooo!";
 $lj->SetEntry($event,$NewText);
-if ($lj->EditEntry($event)) {ok(1)} else {ok(0)}
+if ($lj->EditEntry($event)) {
+  ok(1) ;
+} else {
+  ok(0); 
+  print STDERR "  Error was: $LJ::Simple::error\n";
+}
+
+#goto JTEST;
+
 # Get entry again & compare
 if (defined $lj->GetEntries(\%Entry,undef,"one",$item_id)) {
   if (exists $Entry{$item_id}) {ok(1)} else {ok(0)}
@@ -444,10 +460,9 @@ if (defined $lj->GetEntries(\%Entry,undef,"one",$item_id)) {
 }
 if ($NewText eq $lj->GetEntry($Entry{$item_id})) { ok(1) } else { ok(0) }
 
+JTEST:
 
 ## Be nice and remove the test entry
 if (!$lj->DeleteEntry($item_id)) { ok(0) } else { ok(1) }
-
-JTEST:
 
 exit 0;
