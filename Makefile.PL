@@ -28,11 +28,17 @@ publish: dist
 		cat > \$\$dest/index.html ; \\
 	chmod 644 \$\$dest/* ; \
 
+rebuild-pkg:
+	\@if [ -z "\$(BUILD_PKG_RECURSE)" ] ; then \\
+	  echo "Rebuilding Makefile" ; \\
+	  perl Makefile.PL ; \\
+	  \$(MAKE) pkg BUILD_PKG_RECURSE=yes ; \\
+	fi
 ##
 ## Unless you've got the pkg-tools package this will break for you
 ## as well
 ##
-pkg: pure_all
+pkg: rebuild-pkg pure_all
 	cat InstallPackage/pkginfo | \\
 		sed 's/^VERSION=.*/VERSION=\$(VERSION)/' \\
 		> tmp.pkginfo
@@ -48,5 +54,5 @@ WriteMakefile(
     'PREREQ_PM'		=> {}, # e.g., Module::Name => 1.1
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM => 'Simple.pm', # retrieve abstract from module
-       AUTHOR     => 'A. U. Thor <a.u.thor@a.galaxy.far.far.away>') : ()),
+       AUTHOR     => 'Simon Burr <simes@bpfh.net>') : ()),
 );

@@ -3,7 +3,7 @@
 
 #########################
 use Test;
-BEGIN { plan tests => 49 };
+BEGIN { plan tests => 68 };
 use LJ::Simple;
 ok(1); # If we made it this far, we're ok.
 #########################
@@ -61,6 +61,75 @@ if (defined $lj) {
 } else {
   ok(1);
 }
+
+##
+## A couple of tests to make sure that certains occur as documented
+##
+$lj = new LJ::Simple ({
+        user    =>      "test",
+        pass    =>      "test",
+        site    =>      undef,
+        proxy   =>      undef,
+	moods	=>	0,
+	pics	=>	0,
+      });
+if (defined $lj) {ok(1)} else {ok(0)}
+my %Ref=();
+if (!defined $lj->moods(\%Ref)) {
+  if ($LJ::Simple::error=~/not requested at login/) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+if (!defined $lj->pictures(\%Ref)) {
+  if ($LJ::Simple::error=~/none defined/) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+# Fast login
+$lj = new LJ::Simple ({
+        user    =>      "test",
+        pass    =>      "test",
+        site    =>      undef,
+        proxy   =>      undef,
+	fast	=>	1,
+      });
+if (defined $lj) {ok(1)} else {ok(0)}
+my %Ref=();
+if (!defined $lj->moods(\%Ref)) {
+  if ($LJ::Simple::error=~/not requested at login/) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+if (!defined $lj->pictures(\%Ref)) {
+  if ($LJ::Simple::error=~/none defined/) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+my @clst=$lj->communities();
+if ($#clst==-1) {ok(1)} else {ok(0)}
+if (!$lj->MemberOf("foooo")) {ok(1)} else {ok(0)}
+if (!defined $lj->groups(\%Ref)) {
+  if ($LJ::Simple::error=~/none defined/) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+if (!defined $lj->MapGroupToId("some group")) {
+  if ($LJ::Simple::error=~/none defined/) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+if (!defined $lj->MapIdToGroup(1)) {
+  if ($LJ::Simple::error=~/none defined/) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+if (!$lj->SetProtectGroups(\%Ref,"group")) {
+  if ($LJ::Simple::error=~/not requested/) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+if (!defined $lj->message()) {ok(1)} else {ok(0)}
+
 
 LOGIN:
 
@@ -268,4 +337,21 @@ if (!$lj->DeleteEntry($item_id)) { ok(0) } else { ok(1) }
 my ($num_friends_of,@FriendOf)=$lj->GetFriendOf();
 if (defined $num_friends_of) { ok(1) } else {ok(0)}
 
+my ($num_friends,@Friends)=$lj->GetFriends();
+if (defined $num_friends) { ok(1) } else {ok(0)}
+
+my ($new_friends,$next_check)=$lj->CheckFriends();
+if (defined $new_friends) { ok(1) } else {ok(0)}
+
+my $fooy="";
+my %gdc_hr=();
+if (defined $lj->GetDayCounts(\$fooy,undef)) { ok(0) } else {ok(1)}
+if (defined $lj->GetDayCounts(\%gdc_hr,undef)) { ok(1) } else {ok(0)}
+
+my %gfg_hr=();
+if (defined $lj->GetFriendGroups(\$fooy)) { ok(0) } else {ok(1)}
+if (defined $lj->GetFriendGroups(\%gfg_hr)) { ok(1) } else {ok(0)}
+
 JTEST:
+
+exit 0;

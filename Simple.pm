@@ -9,7 +9,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 our @EXPORT = qw();
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -55,14 +55,24 @@ LJ::Simple - Simple Perl to access LiveJournal
   my $lj = new LJ::Simple ( {
 		user	=>	"username",
 		pass	=>	"password",
+    } );
+  my $lj = new LJ::Simple ( {
+		user	=>	"username",
+		pass	=>	"password",
 		site	=>	"hostname[:port]",
 		proxy	=>	"hostname[:port]",
+		moods	=>	0 | 1,
+		pics	=>	0 | 1,
+		fast	=>	0 | 1,
     } );
   my $lj = LJ::Simple->login ( {
 		user	=>	"username",
 		pass	=>	"password",
 		site	=>	"hostname[:port]",
 		proxy	=>	"hostname[:port]",
+		moods	=>	0 | 1,
+		pics	=>	0 | 1,
+		fast	=>	0 | 1,
     } );
 
   ## Routines which pull information from the login data
@@ -79,6 +89,10 @@ LJ::Simple - Simple Perl to access LiveJournal
 
   ## Routines which pull data from the LJ server
   $lj->GetFriendOf()
+  $lj->GetFriends()
+  $lj->CheckFriends()
+  $lj->GetDayCounts()
+  $lj->GetFriendGroups()
 
   ## Routines for handling journal entries
   # Top level journal access routines
@@ -203,17 +217,32 @@ The actual methods available are:
 
 Logs into the LiveJournal system.
 
+  ## Simplest logon method
+  my $lj = new LJ::Simple ( {
+		user	=>	"username",
+		pass	=>	"password",
+    } );
+  
+  ## Login with options
   my $lj = new LJ::Simple ( {
 		user	=>	"username",
 		pass	=>	"password",
 		site	=>	"hostname[:port]",
 		proxy	=>	"hostname[:port]",
+		moods	=>	0 | 1,
+		pics	=>	0 | 1,
+		fast	=>	0 | 1,
     } );
+
+  ## Login by using login()
   my $lj = LJ::Simple->login ( {
 		user	=>	"username",
 		pass	=>	"password",
 		site	=>	"hostname[:port]",
 		proxy	=>	"hostname[:port]",
+		moods	=>	0 | 1,
+		pics	=>	0 | 1,
+		fast	=>	0 | 1,
     } );
 
 Where:
@@ -222,6 +251,12 @@ Where:
   pass     is the password associated with the username
   site     is the remote site to use
   proxy    is the HTTP proxy site to use
+  moods    is set to 0 if we do not want to download the mood
+           list. Defaults to 1
+  pics     is set to 0 if we do not want to download the user
+           picture information. Defaults to 1
+  fast     is set to 1 if we want to perform a fast login.
+           Default is 0. See below for details of this.
 
 Sites defined in C<site> or C<proxy> are a hostname with an
 optional port number, separated by a C<:>, i.e.:
@@ -235,6 +270,56 @@ C<80> is the default.
 
 If C<proxy> is given C<undef> then the code will go directly to the
 C<$site>. If no port is given then port C<3128> is the default.
+
+If C<moods> is set to C<0> then the mood list will not be pulled from
+the LiveJournal server and the following functions will be affected:
+
+  o moods() will always return undef (error)
+  o Setprop_current_mood_id() will not validate the mood_id
+    given to it.
+  o SetMood() will not attempt to convert the string it is
+    given into a given mood_id
+
+If C<pics> is set to C<0> then the data on the user pictures will
+not be pulled from the LiveJournal server and the following
+functions will be affected:
+
+  o pictures() will always return undef (error)
+  o Setprop_picture_keyword() will blindly set the picture keyword
+    you give it - no validation will be performed.
+
+If C<fast> is set to C<1> then we will perform a I<fast login>. Essentially
+all this does is to set up the various entries in the object hash which
+the routines called after C<login> expect to see; at no time does it talk to
+the LiveJournal servers. What this means is that it is very fast. However it
+also means that when you use parts of the API which B<do> talk to the LiveJournal
+servers its quite possible that you will get back errors associated with
+authentication errors, network outages, I<etc>. In other words, in C<fast> mode
+the login will always succeed, no matter what the state the LiveJournal
+server we're talking is in. It should be noted that the following functions
+will be affected if you enable the I<fast login>:
+
+  o moods() will always return undef (error)
+  o Setprop_current_mood_id() will not validate the mood_id
+    given to it
+  o SetMood() will not attempt to convert the string it is
+    given into a given mood_id
+  o pictures() will always return undef (error)
+  o Setprop_picture_keyword() will blindly set the picture keyword
+    you give it - no validation will be performed
+  o communities() will always return an empty list
+  o MemberOf() will always return 0 (error)
+  o UseJournal() will not validate the shared journal name you
+    give it
+  o groups() will always return undef (error)
+  o MapGroupToId() will always undef (error)
+  o MapIdToGroup() will always undef (error)
+  o SetProtectGroups() will always 0 (error)
+  o message() will always return undef (error)
+  o The key of "groups" in the list of hashes returned by
+    GetFriends() will always point to an empty list
+  o CheckFriends() will return undef (error) if you give it a
+    list of groups
 
 On success this sub-routine returns an C<LJ::Simple> object. On
 failure it returns C<undef> with the reason for the failure being
@@ -255,6 +340,26 @@ Example code:
 	pass	=> "somepass", 
 	site	=> "www.somesite.com:8080",
 	proxy	=> "proxy.internal:3000",
+  });
+  (defined $lj) ||
+    die "$0: Failed to access LiveJournal - $LJ::Simple::error\n";
+
+  ## Another complex example, this time saying that we do not want
+  ## the mood list or user pictures downloaded
+  my $lj = new LJ::Simple ({ 
+	user	=> "someuser",
+	pass	=> "somepass", 
+	pics	=> 0,
+	moods	=> 0,
+  });
+  (defined $lj) ||
+    die "$0: Failed to access LiveJournal - $LJ::Simple::error\n";
+  
+  ## Final example - this one shows the use of the fast logon
+  my $lj = new LJ::Simple ({ 
+	user	=> "someuser",
+	pass	=> "somepass", 
+	fast	=> 1,
   });
   (defined $lj) ||
     die "$0: Failed to access LiveJournal - $LJ::Simple::error\n";
@@ -325,13 +430,29 @@ sub login($$) {
   } else {
     $self->{proxy}=undef;
   }
+
   # Set fastserver to 0 until we know better
   $self->{fastserver}=0;
 
+  if ((exists $hr->{fast}) && ($hr->{fast}==1)) {
+    ## Doing fast login, so return object
+    Debug(dump_hash($self,""));
+    return $self;
+  }
+  
+  my $GetMoods=1;
+  if ((exists $hr->{moods}) && ($hr->{moods}==0)) {
+    $GetMoods=0;
+  }
+  my $GetPics=1;
+  if ((exists $hr->{pics}) && ($hr->{pics}==0)) {
+    $GetPics=0;
+  }
+
   # Perform the actual login
   $self->SendRequest("login", {
-	"moods"		=>	1,
-	"getpickws"	=>	1,
+	"moods"		=>	$GetMoods,
+	"getpickws"	=>	$GetPics,
     },undef) || return undef;
 
   # Now see if we can set fastserver
@@ -376,6 +497,10 @@ sub login($$) {
       }
 
     # Picture key words
+    } elsif ($k=~/^(pickw_count)/o) {
+      if (!defined $self->{pictures}) {
+        $self->{pictures}={};
+      }
     } elsif ($k=~/^(pickw[^_]*)_([0-9]+)/o) {
       my ($type,$id)=($1,$2);
       if (!defined $self->{pictures}) {
@@ -436,9 +561,11 @@ sub login($$) {
   ##
   ## And now we handle the mood map fully
   ##
-  $self->{mood_map}={};
-  foreach (values %{$self->{moods}}) {
-    $self->{mood_map}->{lc($_->{name})}=$_->{id};
+  if ($GetMoods) {
+    $self->{mood_map}={};
+    foreach (values %{$self->{moods}}) {
+      $self->{mood_map}->{lc($_->{name})}=$_->{id};
+    }
   }
 
   Debug(dump_hash($self,""));
@@ -478,6 +605,11 @@ sub message($) {
 Takes a reference to a hash and fills it with information about
 the moods returned back by the server. Either returns back the
 same hash reference or C<undef> on error.
+
+Note that if the LiveJournal
+object was created with either C<moods> set to C<0> or
+with C<fast> set to C<1> then this function will always return
+an error.
 
 The hash the given reference is pointed to is emptied before
 it is used and after a successful call the hash given will
@@ -574,6 +706,7 @@ sub MemberOf($$) {
   my $self=shift;
   my ($community)=@_;
   $LJ::Simple::error="";
+  (defined $self->{access}) || return 0;
   return (exists $self->{access}->{$community});
 }
 
@@ -615,7 +748,7 @@ Example code:
   }
 
 =cut
-sub groups($) {
+sub groups($$) {
   my $self=shift;
   my ($hr) = @_;
   $LJ::Simple::error="";
@@ -706,6 +839,11 @@ Takes a reference to a hash and fills it with information about
 the pictures the user has configured for themselves. Either
 returns back the hash reference or C<undef> on error. Note that
 the user has to have defined picture keywords for this to work.
+
+Note that if the LiveJournal
+object was created with either C<pics> set to C<0> or
+with C<fast> set to C<1> then this function will always return
+an error.
 
 The hash the given reference points to is emptied before it is
 used and after a successful call the hash given will contain
@@ -823,6 +961,8 @@ community which the current LJ user is a member of.
 It should be noted that any of the values in the hash above can be undefined if
 that value was not returned from the LiveJournal server.
 
+The returned list is ordered by the LiveJournal login names of the users.
+
 Example code:
 
   my ($num_friends_of,@FriendOf)=$lj->GetFriendOf();
@@ -862,10 +1002,382 @@ sub GetFriendOf($) {
     }
     $Friends{$id}->{$type}=$v;
   }
-  my @lst=(values %Friends);
+  my @lst=sort {$a->{user} cmp $b->{user}} (values %Friends);
   return ($#lst+1,@lst);
 }
 
+
+=pod
+
+=item $lj->GetFriends()
+
+Returns a list of the other LiveJournal user who are listed as friends of
+the current user. The list returned contains a least one entry, the
+number of entries in the list. This value can range from 0 to however
+many users are in the list. In the event of a failure this value is
+undefined.
+
+The list of friends is a list of hash references which contain data
+about the users who list the current user as a friend. Each hash
+referenced will contain the following:
+
+  {
+    user      => The LiveJournal username
+    name      => The full name of the user
+    fg        => The foreground colour which represents the user
+    bg        => The background colour which represents the user
+    dob       => The date of birth for the user
+    birthday  => The birthday of the user
+    groups    => The list of friends groups this user is in
+    groupmask => The actual group mask for this user
+    status    => The status of the user
+    type      => The type of the user
+  }
+
+Both the C<bg> and C<fg> values are stored in the format of "C<#>I<RR>I<GG>I<BB>"
+where the I<RR>, I<GG>, I<BB> values are given as two digit hexadecimal numbers which
+range from C<00> to C<ff>.
+
+The C<dob> value is stored as a Unix timestamp; that is seconds since epoch. If the
+user has no date of birth defined B<or> they have only given their birthday then this
+value will be C<undef>.
+
+The C<birthday> value is the date of the user's next birthday given as a Unix timestamp.
+
+The C<groups> value is a reference to a list of the friends group this user is a member
+of. It should be noted that to have any items in the list the user must be a
+member of a friends group and the C<login()> method must B<not> have been called
+with the fast login option.
+
+The C<groupmask> value is the actual group mask for the user. This is used to build
+the C<groups> list. It is a 32-bit number where each bit represents membership of a
+given friends group. Bits 0 and 31 are reserved; all other bits can be used. The bit
+a group corresponds to is taken by bit-shifting 1 by the group id number.
+
+The C<status> of a user can be one of "C<active>", "C<deleted>", "C<suspended>" or "C<purged>".
+
+The C<type> of a user can either be "C<user>" which means that the user is a normal
+LiveJournal user or it can be "C<community>" which means that the user is actually a
+community which the current LJ user is a member of.
+
+It should be noted that any of the values in the hash above can be undefined if
+that value was not returned from the LiveJournal server.
+
+The returned list is ordered by the LiveJournal login names of the users.
+
+Example code:
+
+  use POSIX;
+  
+  my ($num_friends,@Friends)=$lj->GetFriends();
+  (defined $num_friends) ||
+    die "$0: Failed to get friends - $LJ::Simple::error\n";
+  
+  my $f=undef;
+  foreach $f (@Friends) {
+    foreach (qw(dob birthday)) {
+      (defined $f->{$_}) || next;
+      $f->{$_}=strftime("%Y/%m/%d",gmtime($f->{$_}));
+    }
+    my ($k,$v)=(undef,undef);
+    while(($k,$v)=each %{$f}) {
+      (!defined $v) && ($f->{$k}="[undefined]");
+    }
+    print "$f->{user}\n";
+    print "  Name         : $f->{name}\n";
+    print "  Colors       : fg->$f->{fg} bg->$f->{bg}\n";
+    print "  DOB          : $f->{dob}\n";
+    print "  Next birthday: $f->{birthday}\n";
+    print "  Status       : $f->{status}\n";
+    print "  Type         : $f->{type}\n";
+    if ($#{$f->{groups}}>-1) {
+      print "  Friend groups:\n";
+      print "    + ",join("\n    + ",@{$f->{groups}}),"\n";
+    } else {
+      print "  Friend groups: [none]\n";
+    }
+    print "\n";
+  }
+
+=cut
+sub GetFriends($) {
+  my $self=shift;
+  $LJ::Simple::error="";
+  my %Event=(
+    includegroups	=>	1,
+    includebdays	=>	1,
+  );
+  my %Resp=();
+  $self->SendRequest("getfriends",\%Event,\%Resp) || return undef;
+  my %Friends=();
+  my ($k,$v);
+  while(($k,$v)=each %Resp) {
+    ($k=~/^friend_([0-9]+)_(.*)/) || next;
+    my ($id,$type)=($1,$2);
+    if (!exists $Friends{$id}) {
+      $Friends{$id}={
+        user    	=>      undef,
+        name    	=>      undef,
+        bg      	=>      undef,
+        fg      	=>      undef,
+	dob		=>	undef,
+	birthday	=>	undef,
+	groups		=>	[],
+	groupmask	=>	undef,
+        status  	=>      "active",
+        type    	=>      "user",
+      };
+    }
+    if ($type eq "birthday") {
+      ($v=~/([0-9]+)-([0-9]{2})-([0-9]{2})/o) || next;
+      my @tm=(0,0,0,$3,$2,$1-1900);
+      if ($tm[5]>0) {
+        $Friends{$id}->{dob}=mktime(@tm);
+        if (!defined $Friends{$id}->{dob}) {
+          $LJ::Simple::error="Failed to convert time $v into Unix timestamp";
+          return undef;
+        }
+      }
+      $tm[5]=(gmtime(time()))[5];
+      $Friends{$id}->{birthday}=mktime(@tm);
+      if (!defined $Friends{$id}->{birthday}) {
+        $LJ::Simple::error="Failed to convert time $v into Unix timestamp";
+        return undef;
+      }
+    } else {
+      $Friends{$id}->{$type}=$v;
+    }
+  }
+  if (defined $self->{groups}) {
+    my $id=undef;
+    foreach $id (values %Friends) {
+      (defined $id->{groupmask}) || next;
+      foreach (values %{$self->{groups}->{name}}) {
+        my $bit=1 << $_->{id};
+        if (($id->{groupmask} & $bit) == $bit) {
+          push(@{$id->{groups}},$_->{name});
+        }
+      }
+    }
+  }
+  my @lst=sort {$a->{user} cmp $b->{user}} (values %Friends);
+  return ($#lst+1,@lst);
+}
+
+
+=pod
+
+=item $lj->CheckFriends(@groups)
+
+This routine is used to poll the LiveJournal server to see if your friends list
+has been updated or not. This routine returns a list. The first item in the
+list is a value which holds C<1> if there has been an update
+to your friends list and C<0> if not. The second item in the list holds the number
+of seconds you must wait before calling C<CheckFriends()> again.
+In the event of an error C<undef> is returned in the first item of the list.
+
+The routine can be given an optional list of friends group to check instead of
+just looking at all of the friends for the user.
+
+Example code:
+
+  while(1) {
+    my ($new_friends,$next_update)=$lj->CheckFriends();
+    (defined $new_friends) ||
+      die "$0: Failed to check friends - $LJ::Simple::error\n";
+    ($new_friends) && print "Friends list updated\n";
+    sleep($next_update+1);
+  }
+
+=cut
+sub CheckFriends($$) {
+  my $self=shift;
+  my (@groups)=@_;
+  my %Event=();
+  my %Resp=();
+  if ($#groups>-1) {
+    if (!defined $self->{groups}) {
+      $LJ::Simple::error="Groups not requested at login";
+      return 0;
+    }
+    my $g;
+    my $mask=0;
+    foreach $g (@groups) {
+      if (!exists $self->{groups}->{name}->{$g}) {
+        $LJ::Simple::error="Group \"$g\" does not exist";
+        return 0;
+      }
+      $mask=$mask | (1 << $self->{groups}->{name}->{$g}->{id});
+    }
+    $Event{mask}=$mask;
+  }
+  if (exists $self->{checkfriends}) {
+    $Event{lastupdate}=$self->{checkfriends}->{lastupdate};
+    my $currtime=time();
+    if ($currtime<$self->{checkfriends}->{interval}) {
+      $LJ::Simple::error="Insufficent time left between CheckFriends() call";
+      return undef;
+    }
+  } else {
+    $self->{checkfriends}={};
+  }
+  $self->SendRequest("checkfriends",\%Event,\%Resp) || return undef;
+  $self->{checkfriends}->{lastupdate}=$Resp{lastupdate};
+  $self->{checkfriends}->{interval}=time() + $Resp{interval};
+  return ($Resp{new},$Resp{interval});
+}
+
+
+=pod
+
+=item $lj->GetDayCounts($hash_ref,$journal)
+
+This routine is given a reference to hash which it fills with information
+on the journal entries posted to the LiveJournal we are currently associated
+with. On success the reference to the hash will be returned. On error
+C<undef> is returned.
+
+There is an optional argument - C<$journal> - which can be used to gather this
+data for a shared journal the user has access to. If not required then this
+value should be C<undef> or an empty string.
+
+The key to the hash is a date, given as seconds since epoch (I<i.e.> C<time_t>)
+and the value is the number of entries made on that day. Only dates which have
+journal entries made against them will have values in the hash; thus it can be
+assumed that if a date is B<not> in the hash then no journal entries were made
+on that day.
+
+The hash will be emptied before use.
+
+Example code:
+
+  use POSIX;
+  (defined $lj->GetDayCounts(\%gdc_hr,undef))
+    || die "$0: Failed to get day counts - $LJ::Simple::error\n";
+  
+  foreach (sort {$a<=>$b} keys %gdc_hr) {
+    printf("%s %03d\n",strftime("%Y/%m/%d",gmtime($_)),$gdc_hr{$_});
+  }
+
+=cut
+sub GetDayCounts($$$) {
+  my $self=shift;
+  my ($hr,$journal)=@_;
+  $LJ::Simple::error="";
+  if (ref($hr) ne "HASH") {
+    my $r=ref($hr);
+    $LJ::Simple::error="CODE: GetDayCounts() given \"$r\", not a hash reference";
+    return undef;
+  }
+  %{$hr}=();
+  my %Event=();
+  my %Resp=();
+  if ((defined $journal) && ($journal ne "")) {
+    $Event{usejournal}=$journal;
+  }
+  $self->SendRequest("getdaycounts",\%Event,\%Resp) || return undef;
+  my ($k,$v);
+  while(($k,$v)=each %Resp) {
+    ($k=~/([0-9]+)-([0-9]+)-([0-9]+)/o) || next;
+    ($v==0) && next;
+    my $timet=mktime(0,0,0,$3,$2-1,$1-1900);
+    if (!defined $timet) {
+      $LJ::Simple::error="Failed to convert date $k into Unix timestamp";
+      return undef;
+    }
+    if (exists $hr->{$timet}) {
+      $hr->{$timet}=$hr->{$timet}+$v;
+    } else {
+      $hr->{$timet}=$v;
+    }
+  }
+  return $hr;
+}
+
+
+=pod
+
+=item $lj->GetFriendGroups($hash_ref)
+
+This routine is given a reference to a hash which it fills with information
+on the friends groups the user has defined. On success the reference to the
+hash will be returned. On error C<undef> is returned.
+
+The hash key is the id number of the friends group as it is possible to
+have multiple friends groups with the same name. Each hash value is a hash
+reference which points to the following hash:
+
+  {
+    id     => Id of the group; used to create permission masks
+    name   => Name of the group
+    sort   => Sort order number from 0 to 255
+    public => Public group ? 1 for yes, 0 for no
+  }
+
+The hash given will be emptied before use.
+
+Example code:
+
+  my %fg=();
+  (defined $lj->GetFriendGroups(\%fg)) || 
+    die "$0: Failed to get groups - $LJ::Simple::error\n";
+  
+  my $format="| %-4s | %-2s | %-6s | %-40s |\n";
+  my $line=sprintf($format,"","","","");
+  $line=~s/\|/+/go;
+  $line=~s/ /-/go;
+  print $line;
+  printf($format,"Sort","Id","Public","Group");
+  print $line;
+  
+  foreach (sort {$fg{$a}->{sort}<=>$gfg_hr{$b}->{sort}} keys %gfg_hr) {
+    my $hr=$fg{$_};
+    my $pub="No";
+    $hr->{public} && ($pub="Yes");
+    printf($format,$hr->{sort},$hr->{id},$pub,$hr->{name});
+  }
+  
+  print $line;
+
+In case you're wondering, the above code outputs something similar to
+the following:
+
+  +------+----+--------+------------------------------------------+
+  | Sort | Id | Public | Group                                    |
+  +------+----+--------+------------------------------------------+
+  | 5    | 1  | Yes    | Good Friends                             |
+  | 10   | 2  | No     | Communities                              |
+  +------+----+--------+------------------------------------------+
+
+=cut
+sub GetFriendGroups($$) {
+  my $self=shift;
+  my ($hr)=@_;
+   $LJ::Simple::error="";
+  if (ref($hr) ne "HASH") {
+    my $r=ref($hr);
+    $LJ::Simple::error="CODE: GetFriendGroups() given \"$r\", not a hash reference";
+    return undef;
+  }
+  %{$hr}=();
+  my %Event=();
+  my %Resp=();
+  $self->SendRequest("getfriendgroups",\%Event,\%Resp) || return undef;
+  my ($k,$v);
+  while(($k,$v)=each %Resp) {
+    $k=~/^frgrp_([0-9]+)_(.*)$/o || next;
+    my ($id,$name)=($1,$2);
+    if (!exists $hr->{$id}) {
+      $hr->{$id}={
+	id	=> $id,
+	public	=> 0,
+      };
+    }
+    ($name eq "sortorder") && ($name="sort");
+    $hr->{$id}->{$name}=$v;
+  }
+  return $hr;
+}
 
 =pod
 
@@ -979,6 +1491,11 @@ routines, this routine will attempt to first attempt to find the mood given
 to it in the mood list returned by the LiveJournal server. If it is unable to
 find a suitable mood then it uses the text given.
 
+Note that if the LiveJournal
+object was created with either C<moods> set to C<0> or
+with C<fast> set to C<1> then this function will not attempt to find the
+mood name given in C<$mood> in the mood list.
+
 Returns C<1> on success, C<0> otherwise.
 
 Example code:
@@ -996,7 +1513,7 @@ sub SetMood($$$) {
     return 0;
   }
   ## Simple opt - none of the mood names have a space in them
-  if ($mood!~/\s/) { 
+  if (($mood!~/\s/)&&(defined $self->{mood_map})) { 
     my $lc_mood=lc($mood);
     if (exists $self->{mood_map}->{$lc_mood}) {
       return $self->Setprop_current_mood_id($event,$self->{mood_map}->{$lc_mood})
@@ -1030,7 +1547,7 @@ sub UseJournal($$$) {
     $LJ::Simple::error="CODE: Not given a hash reference";
     return 0;
   }
-  if (!exists $self->{access}->{$journal}) {
+  if ((defined $self->{access})&&(!exists $self->{access}->{$journal})) { 
     $LJ::Simple::error="user unable to post to journal \"$journal\"";
     return 0;
   }
@@ -1046,8 +1563,8 @@ sub UseJournal($$$) {
 Sets the subject for the journal entry. The subject has the following
 limitations:
 
- o Limited to a length of 255 characters
- o No newlines are allowed
+  o Limited to a length of 255 characters
+  o No newlines are allowed
 
 Returns C<1> on success, C<0> otherwise.
 
@@ -1238,6 +1755,10 @@ sub SetProtectGroups($$@) {
     $LJ::Simple::error="CODE: Not given a hash reference";
     return 0;
   }
+  if (!defined $self->{groups}) {
+    $LJ::Simple::error="Groups not requested at login";
+    return 0;
+  }
   if ($#grps==-1) {
     $LJ::Simple::error="No group names given";
     return 0;
@@ -1380,9 +1901,12 @@ sub Setprop_current_mood($$$) {
 =item $lj->Setprop_current_mood_id($event,$id)
 
 Used to set the current mood_id for the journal being written. This takes a number which
-refers to a mood_id the LiveJournal server knows about. Note that the number
-given here is only validated if the mood list was requested for when the
-LiveJournal login occured.
+refers to a mood_id the LiveJournal server knows about.
+
+Note that if the LiveJournal
+object was created with either C<moods> set to C<0> or
+with C<fast> set to C<1> then this function will not attempt to validate
+the C<mood_id> given to it.
 
 It is better to use C<$lj->SetMood()> as that will automatically use a
 mood known to the LiveJournal server if it can.
@@ -1480,6 +2004,11 @@ sub Setprop_nocomments($$$) {
 Used to set the picture keyword for the journal entry being written. This takes
 a string. We check to make sure that the picture keyword exists.
 
+Note that if the LiveJournal
+object was created with either C<pics> set to C<0> or
+with C<fast> set to C<1> then this function will B<not> validate
+the picture keyword before setting it.
+
 Returns C<1> on success, C<0> on failure.
 
 Example code:
@@ -1491,16 +2020,18 @@ Example code:
 sub Setprop_picture_keyword($$$) {
   my ($self,$event,$data)=@_;
   $LJ::Simple::error="";
-  my $match=0;
-  foreach (values %{$self->{pictures}}) {
-    if ($_->{name} eq $data) {
-      $match=1;
-      last;
+  if (defined $self->{pictures}) {
+    my $match=0;
+    foreach (values %{$self->{pictures}}) {
+      if ($_->{name} eq $data) {
+        $match=1;
+        last;
+      }
     }
-  }
-  if (!$match) {
-    $LJ::Simple::error="Picture keyword not associated with journal";
-    return 0;
+    if (!$match) {
+      $LJ::Simple::error="Picture keyword not associated with journal";
+      return 0;
+    }
   }
   return $self->Setprop_general($event,"picture_keyword","Setprop_picture_keyword","char",$data);
 }
@@ -1560,10 +2091,10 @@ C<$lj->SetEntry()>.
 
 On success a list containing the following is returned:
 
- o The item_id as returned by the LiveJournal server
- o The anum as returned by the LiveJournal server
- o The item_id of the posted entry as used in HTML - that is the
-   value of C<($item_id * 256) + $anum)>
+  o The item_id as returned by the LiveJournal server
+  o The anum as returned by the LiveJournal server
+  o The item_id of the posted entry as used in HTML - that is the
+    value of C<($item_id * 256) + $anum)>
 
 On failure C<undef> is returned.
 
@@ -1897,6 +2428,9 @@ sub SendRequest($$$$) {
          || ($mode eq "syncitems") 
          || ($mode eq "getfriends") 
          || ($mode eq "friendof") 
+         || ($mode eq "checkfriends") 
+         || ($mode eq "getdaycounts") 
+         || ($mode eq "getfriendgroups") 
           ) {
     if (defined $args) {
       my ($k,$v);
@@ -2086,7 +2620,7 @@ sub SendRequest($$$$) {
   # Got it into a hash - lets see if we made a successful request
   if ( (!exists $self->{request}->{lj}->{success}) ||
        ($self->{request}->{lj}->{success} ne "OK") ) {
-    my $errmsg="No error returned by LJ system";
+    my $errmsg="Server Error, try again later";
     if (exists $self->{request}->{lj}->{errmsg}) {
       $errmsg=$self->{request}->{lj}->{errmsg};
     }

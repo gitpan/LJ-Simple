@@ -1,5 +1,17 @@
 Revision history for Perl extension LJ::Simple.
 
+0.05  Friday September 20 17:16 2002
+	- Added GetFriendGroups() routine
+	- Added GetDayCounts() routine
+	- Added CheckFriends() routine
+	- Added GetFriends() routine
+	- Added various options to the login/new method. The most useful of
+		these is the "fast" option which massively reduces the amount
+		of time taken to login... by not really logging in at all. See
+		the docs for more details.
+	- The GetFriendOf() routine now returns a list sorted by the usernames
+		of the LiveJournals in the list
+
 0.04  Sunday September  1 22:11 2002
 	- Added MemberOf() routine
 	- Added the SyncItems() routine

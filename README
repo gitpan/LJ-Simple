@@ -9,6 +9,8 @@ the following functionality:
  o Synchronise journal entries
  o Delete journal entries
  o Get a list of users who consider the LJ user logged in as their friend
+ o Get a list of the users the LJ user logged in considers a friend
+ o See if the user's friend list has been updated
 
 INSTALLATION
 
