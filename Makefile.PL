@@ -34,15 +34,17 @@ rebuild-pkg:
 	  perl Makefile.PL ; \\
 	  \$(MAKE) pkg BUILD_PKG_RECURSE=yes ; \\
 	fi
-##
-## Unless you've got the pkg-tools package this will break for you
-## as well
-##
-pkg: rebuild-pkg manifypods pure_all
+
+version:
 	cat InstallPackage/pkginfo | \\
 		sed 's/^VERSION=.*/VERSION=\$(VERSION)/' \\
 		> tmp.pkginfo
 	mv tmp.pkginfo InstallPackage/pkginfo
+##
+## Unless you've got the pkg-tools package this will break for you
+## as well
+##
+pkg: rebuild-pkg version manifypods pure_all
 	build-pkg -n %PKG%-v%VERSION%.pkg -K
 	mv InstallPackage/*.pkg .
 

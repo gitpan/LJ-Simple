@@ -1,5 +1,18 @@
 Revision history for Perl extension LJ::Simple.
 
+0.11  Wednesday April 14 12:19:02 BST 2004
+	- Added the test.pl after people on the CPAN mailing list complained;
+		however the script has been altered so that out of the box it
+		hardly touches the functionality of LJ::Simple thanks to the
+		removal of the test user on www.livejournal.com. If people
+		wish they can place another username and password in the $user
+		and $pass variables in test.pl to run all of the test.pl
+		Bear in mind that I'm not going to be held responsible for
+		what happens to the journal that test.pl is pointed at though.
+	- Added the DefaultPicURL() routine to return the URL to the default
+		icon for the user who logged in. Functionality added at
+		request of Gavin Mogan.
+
 0.10  Saturday March 20 21:28:29 GMT 2004
 	- Added the examples directory in the distribution
 	- Fixed a bug in how the SendRequest() routine parsed the

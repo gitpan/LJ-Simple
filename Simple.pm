@@ -9,7 +9,7 @@ require AutoLoader;
 @ISA = qw(Exporter AutoLoader);
 @EXPORT_OK = qw();
 @EXPORT = qw();
-$VERSION = '0.10';
+$VERSION = '0.11';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -95,6 +95,7 @@ LJ::Simple - Simple Perl to access LiveJournal
   $lj->MapGroupToId($group_name)
   $lj->MapIdToGroup($id)
   $lj->pictures($hash_ref)
+  $lj->DefaultPicURL();
   $lj->user()
   $lj->fastserver()
 
@@ -374,6 +375,7 @@ functions will be affected:
   o pictures() will always return undef (error)
   o Setprop_picture_keyword() will blindly set the picture keyword
     you give it - no validation will be performed.
+  o DefaultPicURL() will always return undef (error)
 
 If C<fast> is set to C<1> then we will perform a I<fast login>. Essentially
 all this does is to set up the various entries in the object hash which
@@ -566,6 +568,7 @@ sub login($$) {
   $self->SendRequest("login", {
 	"moods"		=>	$GetMoods,
 	"getpickws"	=>	$GetPics,
+	"getpickurls"	=>	$GetPics,
     },undef) || return undef;
 
   # Now see if we can set fastserver
@@ -583,6 +586,8 @@ sub login($$) {
   $self->{groups}=undef;
   # Images defined
   $self->{pictures}=undef;
+  # Default URL
+  $self->{defaultpicurl}=undef;
   # Message from LJ
   $self->{message}=undef;
 
@@ -614,6 +619,8 @@ sub login($$) {
       if (!defined $self->{pictures}) {
         $self->{pictures}={};
       }
+    } elsif ($k eq "defaultpicurl") {
+      $self->{defaultpicurl}=$v;
     } elsif ($k=~/^(pickw[^_]*)_([0-9]+)/o) {
       my ($type,$id)=($1,$2);
       if (!defined $self->{pictures}) {
@@ -998,6 +1005,31 @@ sub pictures($$) {
   return $hr;
 }
 
+=pod
+
+=item $lj->DefaultPicURL()
+
+Returns the URL of the default picture used by the user.
+
+Note that if the LiveJournal
+object was created with either C<pics> set to C<0> or
+with C<fast> set to C<1> then this function will always return
+an error.
+
+Example code:
+
+  print $lj->DefaultPicURL(),"\n";
+
+=cut
+sub DefaultPicURL($) {
+  my $self=shift;
+  $LJ::Simple::error="";
+  if (!defined $self->{defaultpicurl}) {
+    $LJ::Simple::error="Unable to return default picture URL - none defined";
+    return undef;
+  }
+  return $self->{defaultpicurl};
+}
 
 =pod
 
