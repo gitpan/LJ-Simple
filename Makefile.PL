@@ -38,12 +38,13 @@ rebuild-pkg:
 ## Unless you've got the pkg-tools package this will break for you
 ## as well
 ##
-pkg: rebuild-pkg pure_all
+pkg: rebuild-pkg manifypods pure_all
 	cat InstallPackage/pkginfo | \\
 		sed 's/^VERSION=.*/VERSION=\$(VERSION)/' \\
 		> tmp.pkginfo
 	mv tmp.pkginfo InstallPackage/pkginfo
-	build-pkg -K
+	build-pkg -n %PKG%-v%VERSION%.pkg -K
+	mv InstallPackage/*.pkg .
 
 EOF
 }

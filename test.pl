@@ -3,7 +3,7 @@
 
 #########################
 use Test;
-BEGIN { plan tests => 97 };
+BEGIN { plan tests => 99 };
 use LJ::Simple;
 ok(1); # If we made it this far, we're ok.
 #########################
@@ -288,8 +288,8 @@ if (!$lj->SetProtectGroups(\%Event,"meep foo bar baz")) {
 } else {
   ok(0);
 }
-# This should work
-if (!$lj->SetProtectGroups(\%Event,"Communities")) { ok(0) } else { ok(1) }
+# This *should* work, but is disabled since its too unreliable
+#if (!$lj->SetProtectGroups(\%Event,"Communities")) { ok(0) } else { ok(1) }
 
 ## Set subject
 if ($lj->SetSubject(\%Event,"a"x256)) { ok(0) } else { ok(1) }
@@ -408,15 +408,18 @@ if (defined $lj->GetEntries(\%GE_hr,undef,"lastn",undef,undef)) {
 } else {
   ok(0);
 }
+
 # lastn, last 20 entries before current time
-if (defined $lj->GetEntries(\%GE_hr,undef,"lastn",undef,$^T)) {
-  if (!exists $GE_hr{$item_id}) {ok(1)} else {ok(0)}
+if (defined $lj->GetEntries(\%GE_hr,undef,"lastn",undef,time()+800)) {
+  if (exists $GE_hr{$item_id}) {ok(1)} else {ok(0)}
 } else {
   ok(0);
 }
+
+my %Entry=();
 # one, just our latest entry
-if (defined $lj->GetEntries(\%GE_hr,undef,"one",$item_id)) {
-  if (exists $GE_hr{$item_id}) {ok(1)} else {ok(0)}
+if (defined $lj->GetEntries(\%Entry,undef,"one",$item_id)) {
+  if (exists $Entry{$item_id}) {ok(1)} else {ok(0)}
 } else {
   ok(0);
 }
@@ -426,6 +429,20 @@ if (defined $lj->GetEntries(\%GE_hr,undef,"sync",$^T-86400)) {
 } else {
   ok(0);
 }
+
+# Edit the latest entry
+my $event=$Entry{$item_id};
+my $NewText="Foooooooooo!";
+$lj->SetEntry($event,$NewText);
+if ($lj->EditEntry($event)) {ok(1)} else {ok(0)}
+# Get entry again & compare
+if (defined $lj->GetEntries(\%Entry,undef,"one",$item_id)) {
+  if (exists $Entry{$item_id}) {ok(1)} else {ok(0)}
+} else {
+  ok(0);
+}
+if ($NewText eq $lj->GetEntry($Entry{$item_id})) { ok(1) } else { ok(0) }
+
 
 ## Be nice and remove the test entry
 if (!$lj->DeleteEntry($item_id)) { ok(0) } else { ok(1) }

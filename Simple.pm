@@ -1,15 +1,15 @@
 package LJ::Simple;
 
-use 5.006;
 use strict;
-use warnings;
+use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 
 require Exporter;
+require AutoLoader;
 
-our @ISA = qw(Exporter);
-our @EXPORT_OK = ();
-our @EXPORT = qw();
-our $VERSION = '0.06';
+@ISA = qw(Exporter AutoLoader);
+@EXPORT_OK = qw();
+@EXPORT = qw();
+$VERSION = '0.07';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -43,11 +43,14 @@ LJ::Simple - Simple Perl to access LiveJournal
   # Do we show the LJ protocol ?
   $LJ::Simple::protocol = 0;
 
+  # Do we use version 1 of the LJ protocol and thus support UTF-8 ?
+  $LJ::Simple::UTF = 0;
+
   # Where error messages are placed
   $LJ::Simple::error = "";
 
-  # The timeout on reading from sockets in seconds
-  $LJ::Simple::timeout = 10;
+  # The timeout on reading from sockets in seconds - default is 5 minutes
+  $LJ::Simple::timeout = 500;
 
   # How much data to read from the socket in one read()
   $LJ::Simple::buffer = 8192;
@@ -100,6 +103,7 @@ LJ::Simple - Simple Perl to access LiveJournal
   $lj->UseJournal($event,$journal)
   $lj->NewEntry($event)
   $lj->PostEntry($event)
+  $lj->EditEntry($event)
   $lj->DeleteEntry($item_id)
   $lj->SyncItems($time_t)
   $lj->GetEntries($hash_ref,$journal,$type,@opt)
@@ -154,6 +158,16 @@ LJ::Simple - Simple Perl to access LiveJournal
   $lj->Getprop_noemail($event)
   $lj->Getprop_unknown8bit($event)
 
+=head1 REQUIREMENTS
+
+This module requires nothing other than the modules which come with the
+standard perl 5.6.1 distribution. The only modules it B<requires> are
+C<POSIX> and C<Socket>.
+
+If you have the C<Digest::MD5> module available then the code will make use of
+encrypted passwords automatically. However C<Digest::MD5> is not required for
+this module to work.
+
 =head1 DESCRIPTION
 
 LJ::Simple is a trival API to access LiveJournal. Currently all that it
@@ -174,6 +188,10 @@ Post a new journal entry in the LiveJournal system
 Returns a list of journal entries created or modified from a given
 date.
 
+=item Edit
+
+Edit the contents of an existing entry within the LiveJournal system
+
 =item Delete
 
 Delete an existing post from the LiveJournal system
@@ -191,6 +209,11 @@ If set to 1, debugging messages are sent to stderr.
 =item $LJ::Simple::protocol
 
 If set to 1 the protocol used to talk to the remote server is sent to stderr.
+
+=item $LJ::Simple::UTF
+
+If set to 1 the LiveJournal server is told to expect UTF-8 encoded characters.
+If you enable this the module will attempt to use the utf8 perl module.
 
 =item $LJ::Simple::error
 
@@ -219,10 +242,12 @@ The number of bytes to try and read in on each C<sysread()> call.
 $LJ::Simple::debug=0;
 # Show protocol ?
 $LJ::Simple::protocol=0;
+# Use UTF-8 ?
+$LJ::Simple::UTF = 0;
 # Errors
 $LJ::Simple::error="";
-# Timeout for reading from sockets
-$LJ::Simple::timeout = 10;
+# Timeout for reading from sockets - default is 5 minutes
+$LJ::Simple::timeout = 300;
 # How much data to read from the socket in one read()
 $LJ::Simple::buffer = 8192;
 
@@ -418,6 +443,15 @@ sub login($$) {
 	user	=>	$hr->{user},
 	pass	=>	$hr->{pass},
   };
+  if ($LJ::Simple::UTF) {
+    eval { require utf8 };
+    if (!$@) {
+      Debug("Using UTF-8 as requested");
+    } else {
+      $LJ::Simple::error="CODE: no UTF-8 support in your version of perl";
+      return undef;
+    }
+  }
   eval { require Digest::MD5 };
   if (!$@) {
     Debug("Using Digest::MD5");
@@ -2005,7 +2039,8 @@ sub Setprop_preformatted($$$) {
 =item $lj->Setprop_nocomments($event,$onoff)
 
 Used to set if the journal entry being written can be commented on or not. This takes
-a boolean value of C<1> for true and C<0> for false.
+a boolean value of C<1> for true and C<0> for false. Thus if you use a value
+of C<1> (true) then comments will not be allowed.
 
 Returns C<1> on success, C<0> on failure.
 
@@ -2108,7 +2143,7 @@ sub Setprop_unknown8bit($$$) {
 
 =pod
 
-=item $lj->PostEntry(\$event)
+=item $lj->PostEntry($event)
 
 Submit a journal entry into the LiveJournal system. This requires you to have
 set up the journal entry with C<$lj-<gt>NewEntry()> and to have at least called
@@ -2181,6 +2216,70 @@ sub PostEntry($$) {
   return ($Resp{itemid},$Resp{anum},($Resp{itemid} * 256) + $Resp{anum});
 }
 
+=pod
+
+=item $lj->EditEntry($event)
+
+Edit an entry from the LiveJournal system which has the givem C<item_id>.
+The entry should have been fetched from LiveJournal using the
+C<$lj-<gt>GetEntries()> function and then adjusted using the various
+C<$lj-<gt>Set...()> functions.
+
+It should be noted that this function can be used to delete a journal entry
+by setting the entry to a blank string, I<i.e.> by using
+C<$lj-<gt>SetEntry(\%Event,undef)>
+
+Returns C<1> on success, C<0> on failure.
+
+Example:
+
+  # Fetch the most recent event
+  my %Events = ();
+  (defined $lj->GetEntries(\%Events,undef,"one",-1)) ||
+    die "$0: Failed to get entries - $LJ::Simple::error\n";
+  
+  # Mark it as private
+  foreach (values %Entries) {
+    $lj->SetProtectPrivate($_);
+    $lj->EditEntry($_) ||
+      die "$0: Failed to edit entry - $LJ::Simple::error\n";
+  }
+  
+  # Alternatively we could just delete it...
+  my $event=(values %Entries)[0];
+  $lj->SetEntry($event,undef);
+  $lj->EditEntry($event) ||
+    die "$0: Failed to edit entry - $LJ::Simple::error\n";
+
+=cut
+sub EditEntry($$) {
+  my $self=shift;
+  my ($event)=@_;
+  $LJ::Simple::error="";
+  if (ref($event) ne "HASH") {
+    $LJ::Simple::error="CODE: Not given a hash reference";
+    return 0;
+  }
+  if (!exists $event->{"__itemid"}) {
+    $LJ::Simple::error="CODE: Not an existing entry; use GetEntry()";
+    return 0;
+  }
+  $event->{itemid}=$event->{"__itemid"};
+
+  ## Blat any key in $event which starts with a double underscore
+  map {/^__/ && delete $event->{$_}} (keys %{$event});
+
+  if (!defined $event->{event}) {
+    $LJ::Simple::error="CODE: No journal entry set";
+    return 0;
+  }
+
+  ## Blat any entry in $event with an undef value
+  map {defined $event->{$_} || delete $event->{$_}} (keys %{$event});
+
+  ## Make the request
+  return $self->SendRequest("editevent",$event,undef);
+}
 
 =pod
 
@@ -3286,8 +3385,10 @@ sub SendRequest($$$$) {
   } else {
     push(@request,EncVal("password",$self->{auth}->{pass}));
   }
+  my $ljprotver=0;
+  if ($LJ::Simple::UTF) { $ljprotver=1; }
   push(@request,
-	"ver=0",
+	"ver=$ljprotver",
   );
   if ($mode eq "login") {
     push(@request,EncVal("clientversion","Perl-LJ::Simple/$VERSION"));
@@ -3626,6 +3727,8 @@ posts a simple comment.
   
   # Prepare the event
   my %Event=();
+  $lj->NewEntry(\%Event) ||
+    die "$0: Failed to create new entry: $LJ::Simple::error\n";
   
   # Put in the entry
   my $entry=<<EOF;
@@ -3639,6 +3742,8 @@ posts a simple comment.
     || die "$0: Failed to set mood: $LJ::Simple::error\n";
   
   # Don't allow comments
+  # Note that to allow comments you can just remove this call to
+  # Setprop_nocomments() completely - the default is to allow comments.
   $lj->Setprop_nocomments(\%Event,1);
   
   my ($item_id,$anum,$html_id)=$lj->PostEntry(\%Event);
