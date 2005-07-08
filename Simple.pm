@@ -9,7 +9,7 @@ require AutoLoader;
 @ISA = qw(Exporter AutoLoader);
 @EXPORT_OK = qw();
 @EXPORT = qw();
-$VERSION = '0.12.1';
+$VERSION = '0.13';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -106,7 +106,6 @@ the following example shows how it can be used to easily post to LiveJournal:
           user    =>      "test",
           pass    =>      "test",
           site    =>      undef,
-          proxy   =>      undef,
         });
   (defined $lj)
     || die "$0: Failed to log into LiveJournal: $LJ::Simple::error\n";
@@ -328,6 +327,13 @@ $LJ::Simple::buffer = 8192;
 # Should we not fully run the QuickPost routine ?
 $LJ::Simple::TestStopQuickPost = 0;
 
+## Internal variables - private to this module
+# Standard ports
+my %StdPort = (
+	http		=>	80,
+	http_proxy	=>	3128,
+);
+
 =pod
 
 =head1 AVAILABLE METHODS
@@ -547,7 +553,7 @@ Where:
   user     is the username to use
   pass     is the password associated with the username
   site     is the remote site to use
-  proxy    is the HTTP proxy site to use
+  proxy    is the HTTP proxy site to use; see below.
   moods    is set to 0 if we do not want to download the mood
            list. Defaults to 1
   pics     is set to 0 if we do not want to download the user
@@ -566,7 +572,22 @@ connect to C<www.livejournal.com:80>. If no port is given then port
 C<80> is the default.
 
 If C<proxy> is given C<undef> then the code will go directly to the
-C<$site>. If no port is given then port C<3128> is the default.
+C<$site> unless a suitable environment variable is set.
+If no port is given then port C<3128> is the default.
+
+C<LJ::Simple> also supports the use the environment variables C<http_proxy>
+and C<HTTP_PROXY> to store the HTTP proxy server details. The format of these
+environment variables is assumed to be:
+
+  http://server[:port]/
+
+Where C<server> is the name of the proxy server and the optional C<port> the
+proxy server is on - port C<3128> is used if no port is explicitly given.
+
+It should be noted that the proxy environment variables are B<only> checked
+if the C<proxy> value is B<NOT> given to the C<LJ::Simple> object creation.
+Thus to disable looking at the proxy environment variables use
+C<proxy=E<gt>undef> in C<new()> or C<login()>.
 
 If C<moods> is set to C<0> then the mood list will not be pulled from
 the LiveJournal server and the following functions will be affected:
@@ -726,7 +747,7 @@ sub login($$) {
     $LJ::Simple::challenge=0;
   }
   if ((exists $hr->{site})&&(defined $hr->{site})&&($hr->{site} ne "")) {
-    my $site_port=80;
+    my $site_port=$StdPort{http};
     if ($hr->{site}=~/\s*(.*?):([0-9]+)\s*$/) {
       $hr->{site} = $1;
       $site_port = $2;
@@ -738,11 +759,11 @@ sub login($$) {
   } else {
     $self->{lj}={
   	host	=>	"www.livejournal.com",
-  	port	=>	80,
+  	port	=>	$StdPort{http},
     }
   }
   if ((exists $hr->{proxy})&&(defined $hr->{proxy})&&($hr->{proxy} ne "")) {
-    my $proxy_port=3128;
+    my $proxy_port=$StdPort{http_proxy};
     if ($hr->{proxy}=~/\s*(.*?):([0-9]+)\s*$/) {
       $hr->{proxy} = $1;
       $proxy_port = $2;
@@ -750,6 +771,19 @@ sub login($$) {
     $self->{proxy}={
   	host	=>	$hr->{proxy},
   	port	=>	$proxy_port,
+    };
+  } elsif (!exists $hr->{proxy}) {
+    # Getting proxy details from the environment; assumes that the proxy is
+    # given as http://site[:port]/
+    # The first matching env is used.
+    foreach my $env (qw( http_proxy HTTP_PROXY )) {
+      (exists $ENV{$env}) || next;
+      ($ENV{$env}=~/^(?:http:\/\/)([^:\/]+)(?::([0-9]+)){0,1}/o) || next;
+      $self->{proxy}={
+  	host	=>	$1,
+  	port	=>	$2,
+      };
+      (defined $self->{proxy}->{port}) || ($self->{proxy}->{port}=$StdPort{http_proxy});
     }
   } else {
     $self->{proxy}=undef;
@@ -2323,6 +2357,25 @@ sub Setprop_general($$$$$$) {
 
 =over 4
 
+=item $lj->Setprop_taglist($event,@tags)
+
+Set the tags for the entry; C<@tags> is a list of the tags to give the 
+entry.
+
+Example code:
+
+  $lj->Setprop_taglist(\%Event,qw( gabe pets whatever )) ||
+    die "$0: Failed to set back date property - $LJ::Simple::error\n";
+
+=cut
+sub Setprop_taglist($$@) {
+  my ($self,$event,@tags)=@_;
+  $LJ::Simple::error="";
+  return $self->Setprop_general($event,"taglist","Setprop_taglist","char",join(", ",@tags));
+}
+
+=pod
+
 =item $lj->Setprop_backdate($event,$onoff)
 
 Used to indicate if the journal entry being written should be back dated or not. Back dated
@@ -2839,6 +2892,11 @@ Example code:
           "$hr->{timestamp}\n";
   }
 
+There is also an example of how to work with all of the entries of a LiveJournal
+shown in the C<examples/friends-only> script which accompanies the C<LJ::Simple>
+distribution. This example script looks at a LiveJournal and makes sure that every
+journal entry is at the very least marked as being friends-only.
+
 =cut
 sub SyncItems($$) {
   my $self=shift;
@@ -2931,8 +2989,13 @@ sub SyncItems($$) {
 =item $lj->GetEntries($hash_ref,$journal,$type,@opt)
 
 This routine allows you to pull events from the user's LiveJournal. There are
-several different ways for this routine to work depending on the value given in
+several different ways this routine can work depending on the value given in
 the C<$type> argument.
+
+This routine will currently only allow you to get a B<maximum of 50 journal entries>
+thanks to restrictions imposed by LiveJournal servers. If you want to perform work
+on I<every> journal entry within a LiveJournal account then you should look at the
+C<SyncItems()> routine documented above.
 
 The first argument - C<$hash_ref> is a reference to a hash which will be filled
 with the details of the journal entries downloaded. The key to this hash is the
@@ -4077,8 +4140,7 @@ sub SendRequest($$$$) {
       $bytes_in=$bytes_in+$nbytes;
       (defined $sub) && &{$sub}($mode,$cp,"Getting response from server $server",$bytes_in,$bytes_out,time()-$timestart,0);
       $cp=$cp+0.001;
-      $resp=~s/\r//go;
-      $response=join("",$response,$resp);
+      $response="$response$resp";
       if ($LJ::Simple::raw_protocol) {
         print STDERR "<-- ";
         foreach (split(//,$resp)) {
@@ -4087,7 +4149,7 @@ sub SendRequest($$$$) {
         }
         print STDERR "\n";
       } elsif ($LJ::Simple::protocol) {
-        foreach (split(/\n/,$resp)) {
+        foreach (split(/[\r\n]{1,2}/o,$resp)) {
           &{$proto}(1,$_,$server,$ip_addr);
         }
       }
@@ -4120,7 +4182,7 @@ sub SendRequest($$$$) {
   }
 
   # Split into headers and body
-  my ($http,$body)=split(/\n\n/,$response,2);
+  my ($http,$body)=split(/\r\n\r\n/,$response,2);
 
   if (!defined $http) {
     $LJ::Simple::error="Failed to get HTTP headers from server";
@@ -4135,7 +4197,7 @@ sub SendRequest($$$$) {
 
   # First lets see if we got a valid response
   $self->{request}->{http}={};
-  $self->{request}->{http}->{headers}=[(split(/\n/,$http))];
+  $self->{request}->{http}->{headers}=[(split(/\r\n/,$http))];
   my $srv_resp=$self->{request}->{http}->{headers}->[0];
   $srv_resp=~/^HTTP\/[^\s]+\s([0-9]+)\s+(.*)/;
   my ($srv_code,$srv_msg)=($1,$2);

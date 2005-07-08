@@ -40,6 +40,14 @@ version:
 		sed 's/^VERSION=.*/VERSION=\$(VERSION)/' \\
 		> tmp.pkginfo
 	mv tmp.pkginfo InstallPackage/pkginfo
+	sed 's/^\\(LJ::Simple version \\).*/\\1\$(VERSION)/' README > README.new
+	if [ -s README.new ]; then \\
+	  mv README.new README ; \\
+	else \\
+	  echo "Need to update README version"; \\
+	  rm README.new ; \\
+	  exit 1 ; \\
+	fi
 ##
 ## Unless you've got the pkg-tools package this will break for you
 ## as well

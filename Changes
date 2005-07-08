@@ -1,9 +1,31 @@
 Revision history for Perl extension LJ::Simple.
 
+0.13  Fri Jul  8 10:35:04 BST 2005
+	- Documentation fix for GetEntries() to note that it will only every
+		return 50 items no matter what mode is used. Added pointer to
+		SyncItems(). SyncItems() documentation updated to add a pointer
+		to the examples/friends-only script.
+	- Correct the version target in Makefile.PL so that the version shown
+		in the README file is correctly updated.
+	- Added the Setprop_taglist() method to set tags in posts
+	- Updated examples/ljpost to include setting of tags
+	- Fixed how the SendRequest() handles the response from the server; it
+		no longer blindly removes \r from the response. Whilst at the
+		moment this is not an issue as the flat protocol is unlikely to
+		contain \r, it could be an issue in the future.
+	- Fixed the test script test.pl to deal with a failure to create the
+		object; correctly handles returning the right number of tests.
+		Problem noted by STEPANOV
+	- Added support for http_proxy and HTTP_PROXY environment variables
+		within the LJ::Simple object creation. The environment variables
+		on only looked at iff the http variable is *not* given during the
+		object creation.
+		Problem noted by STEPANOV
+
 0.12.1  Wed Jan 12 21:13:35 GMT 2005
-	- Minor release for a fix to QuickPost() which caused a runtime error if a subject
-		was set. The documentation was also corrected to show that the entry option
-		is always required.
+	- Minor release for a fix to QuickPost() which caused a runtime error
+		if a subject was set. The documentation was also corrected to
+		show that the entry option is always required.
 
 0.12  Wed Jan  5 23:35:07 GMT 2005
 	- Added the $LJ::Simple::NonBlock hook to allow better integration with

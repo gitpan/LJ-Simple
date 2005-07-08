@@ -1,5 +1,5 @@
-LJ::Simple version 0.07
-=======================
+LJ::Simple version 0.13
+===========================
 
 LJ::Simple is a simple perl API to LiveJournal. Currently it provides
 the following functionality:

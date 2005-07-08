@@ -4,7 +4,7 @@
 ## It pulls details from the .livejournal file or ask the
 ## user for the auth details if that is not present.
 ##
-##  $Id: ljpost,v 1.5 2004/05/20 16:31:23 simes Exp $
+##  $Id: ljpost,v 1.6 2005/06/28 16:47:26 simes Exp $
 ##
 
 use strict;				# Silly not to be
@@ -189,6 +189,11 @@ if ($music ne "") {
 }
 
 SetPicture($lj,\%Event);
+print STDERR "Comma separated list of tags: ";
+my $tags=<STDIN>;
+chomp($tags);
+($tags ne "") && $lj->Setprop_taglist(\%Event,split(/,\s*/,$tags));
+
 
 print "Do not auto-format [y/n] ? ";
 my $ans=<STDIN>;
@@ -310,6 +315,9 @@ Simon Burr E<lt>F<simes@bpfh.net>E<gt>
 
 ##
 ## $Log: ljpost,v $
+## Revision 1.6  2005/06/28 16:47:26  simes
+## ljpost now supports tags
+##
 ## Revision 1.5  2004/05/20 16:31:23  simes
 ## Fixed timezone issue in ljpost
 ##
