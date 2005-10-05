@@ -3,7 +3,7 @@
 ## A command which will go through a journal and ensure that all entries
 ## are at least made friends-only
 ##
-##   $Id: friends-only,v 1.3 2003/09/25 14:32:08 simes Exp $
+##   $Id: friends-only,v 1.4 2005/09/19 16:33:39 simes Exp $
 ##
 
 use strict;             # Silly not to be
@@ -133,6 +133,15 @@ foreach (@ItemId) {
     print "[$date] $item_id $anum = $key\n";
     if ($ToProt) {
       if (!$DryRun) {
+        my $ent=$lj->GetEntry($Entry);
+        if (!defined $ent) {
+          print "  FAILED: $LJ::Simple::error\n";
+          next;
+        }
+        if ($ent eq "") {
+          print "  FAILED: blank entry\n";
+          next;
+        }
         print "  Making entry friends-only\n";
         $lj->SetProtectFriends($Entry);
         $lj->EditEntry($Entry)

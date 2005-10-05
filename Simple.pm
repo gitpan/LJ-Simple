@@ -9,7 +9,7 @@ require AutoLoader;
 @ISA = qw(Exporter AutoLoader);
 @EXPORT_OK = qw();
 @EXPORT = qw();
-$VERSION = '0.13';
+$VERSION = '0.14';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -1477,7 +1477,7 @@ Example code:
   foreach $f (@Friends) {
     foreach (qw(dob birthday)) {
       (defined $f->{$_}) || next;
-      $f->{$_}=strftime("%Y/%m/%d",gmtime($f->{$_}));
+      $f->{$_}=strftime("%Y/%m/%d",localtime($f->{$_}));
     }
     my ($k,$v)=(undef,undef);
     while(($k,$v)=each %{$f}) {
@@ -1538,7 +1538,7 @@ sub GetFriends($) {
           return undef;
         }
       }
-      $tm[5]=(gmtime(time()))[5];
+      $tm[5]=(localtime(time()))[5];
       $Friends{$id}->{birthday}=mktime(@tm);
       if (!defined $Friends{$id}->{birthday}) {
         $LJ::Simple::error="Failed to convert time $v into Unix timestamp";
@@ -1590,7 +1590,7 @@ Example code:
   }
 
 =cut
-sub CheckFriends($$) {
+sub CheckFriends($@) {
   my $self=shift;
   my (@groups)=@_;
   my %Event=();
@@ -1656,7 +1656,7 @@ Example code:
     || die "$0: Failed to get day counts - $LJ::Simple::error\n";
   
   foreach (sort {$a<=>$b} keys %gdc_hr) {
-    printf("%s %03d\n",strftime("%Y/%m/%d",gmtime($_)),$gdc_hr{$_});
+    printf("%s %03d\n",strftime("%Y/%m/%d",localtime($_)),$gdc_hr{$_});
   }
 
 =cut
@@ -1918,6 +1918,10 @@ sub SetMood($$$) {
     $LJ::Simple::error="CODE: Not given a hash reference";
     return 0;
   }
+  if (!defined $mood) {
+    $LJ::Simple::error="CODE: given undef value for a mood";
+    return 0;
+  }
   ## Simple opt - none of the mood names have a space in them
   if (($mood!~/\s/)&&(defined $self->{mood_map})) { 
     my $lc_mood=lc($mood);
@@ -1951,6 +1955,10 @@ sub UseJournal($$$) {
   $LJ::Simple::error="";
   if (ref($event) ne "HASH") {
     $LJ::Simple::error="CODE: Not given a hash reference";
+    return 0;
+  }
+  if (!defined $journal) {
+    $LJ::Simple::error="CODE: Given undefined value for journal";
     return 0;
   }
   if ((defined $self->{access})&&(!exists $self->{access}->{$journal})) { 
@@ -1988,6 +1996,7 @@ sub SetSubject($$$) {
     $LJ::Simple::error="CODE: Not given a hash reference";
     return 0;
   }
+  (defined $subject) || ($subject="");
   if (length($subject)>255) {
     my $len=length($subject);
     $LJ::Simple::error="Subject length limited to 255 characters [given $len]";
@@ -2166,6 +2175,10 @@ sub SetProtect($$$@) {
     $LJ::Simple::error="CODE: Not given a hash reference";
     return 0;
   }
+  if (!defined $type) {
+    $LJ::Simple::error="CODE: given undefined value for type";
+    return 0;
+  }
   if ($type eq "public") {
     return $self->SetProtectPublic($event);
   } elsif ($type eq "friends") {
@@ -2203,7 +2216,7 @@ sub SetProtectPublic($$) {
     $LJ::Simple::error="CODE: Not given a hash reference";
     return 0;
   }
-  (exists $event->{security}) && delete $event->{security};
+  $event->{security}="public";
   (exists $event->{allowmask}) && delete $event->{allowmask};
   return 1;
 }
@@ -2273,6 +2286,10 @@ sub SetProtectGroups($$@) {
   my $g;
   my $mask=0;
   foreach $g (@grps) {
+    if (!defined $g) {
+      $LJ::Simple::error="Group list contains undefined value";
+      return 0;
+    }
     if (!exists $self->{groups}->{name}->{$g}) {
       $LJ::Simple::error="Group \"$g\" does not exist";
       return 0;
@@ -2319,6 +2336,22 @@ sub Setprop_general($$$$$$) {
   $LJ::Simple::error="";
   if (ref($event) ne "HASH") {
     $LJ::Simple::error="CODE: Not given a hash reference";
+    return 0;
+  }
+  if (!defined $prop) {
+    $LJ::Simple::error="CODE: given undefined value for property";
+    return 0;
+  }
+  if (!defined $caller) {
+    $LJ::Simple::error="CODE: given undefined value for caller setting $prop";
+    return 0;
+  }
+  if (!defined $type) {
+    $LJ::Simple::error="CODE: given undefined value for type by $caller setting $prop";
+    return 0;
+  }
+  if (!defined $data) {
+    $LJ::Simple::error="CODE: given undefined value for data by $caller setting $prop";
     return 0;
   }
   my $nd=undef;
@@ -2902,6 +2935,10 @@ sub SyncItems($$) {
   my $self=shift;
   my ($timet)=@_;
   $LJ::Simple::error="";
+  if (!defined $timet) {
+    $LJ::Simple::error="CODE: Invalid timestamp - undefined value not allowed";
+    return undef;
+  }
   if ($LJ::Simple::debug) {
     my $ts=undef;
     if (defined $timet) {
@@ -2915,7 +2952,7 @@ sub SyncItems($$) {
   my %Resp=();
   if (defined $timet) {
     if ($timet=~/^[0-9]+$/) {
-      my @tm=gmtime($timet);
+      my @tm=localtime($timet);
       if ($#tm==-1) {
         $LJ::Simple::error="CODE: Invalid timestamp";
         return undef;
@@ -3075,7 +3112,7 @@ all of the various C<Get*()> routines to decode the hash returned.
     my $timet=$lj->GetDate($Entry);
     if (defined $timet) {
       printf($Format,"Date",
-             strftime("%Y-%m-%d %H:%M:%S",gmtime($timet)));
+             strftime("%Y-%m-%d %H:%M:%S",localtime($timet)));
     }
   
     # Is entry protected ?
@@ -3165,6 +3202,10 @@ sub GetEntries($$@) {
     $LJ::Simple::error="CODE: GetEntries() not given a hash reference";
     return undef;
   }
+  if (!defined $type) {
+    $LJ::Simple::error="CODE: GetEntries() given undefined value for type";
+    return undef;
+  }
   %{$hr}=();
   my %Event=();
   my %Resp=();
@@ -3182,7 +3223,7 @@ sub GetEntries($$@) {
       $LJ::Simple::error="CODE: GetEntries($type) given invalid timestamp";
       return undef;
     }
-    my @tm=gmtime($timestamp);
+    my @tm=localtime($timestamp);
     if ($#tm==-1) {
       $LJ::Simple::error="CODE: GetEntries($type) given invalid timestamp";
       return undef;
@@ -3216,7 +3257,7 @@ sub GetEntries($$@) {
         $LJ::Simple::error="Invalid Unix timestamp";
         return undef;
       }
-      my @tm=gmtime($beforedate);
+      my @tm=localtime($beforedate);
       if ($#tm==-1) {
         $LJ::Simple::error="CODE: GetEntries($type) given invalid timestamp";
         return undef;
@@ -3249,7 +3290,7 @@ sub GetEntries($$@) {
       $LJ::Simple::error="Invalid Unix timestamp";
       return undef;
     }
-    my @tm=gmtime($lastsync);
+    my @tm=localtime($lastsync);
     if ($#tm==-1) {
       $LJ::Simple::error="CODE: GetEntries($type) given invalid timestamp";
       return undef;
@@ -3346,10 +3387,10 @@ Example code:
   (defined $timet)
     || die "$0: Failed to set date of entry - $LJ::Simple::error\n";
   
-  # Get time list using gmtime()
-  my @tm=gmtime($timet);
+  # Get time list using localtime()
+  my @tm=localtime($timet);
   ($#tm<0) &&
-    die "$0: Failed to run gmtime() on time_t $timet\n";
+    die "$0: Failed to run localtime() on time_t $timet\n";
   
   # Format date in the normal way used by LJ "YYYY-MM-DD hh:mm:ss"
   my $jtime=strftime("%Y-%m-%d %H:%M:%S",@tm);
@@ -3833,10 +3874,12 @@ sub Getprop_unknown8bit($$) {
 ##
 sub EncVal($$) {
   my ($key,$val)=@_;
+  (defined $key) || ($key="");
+  (defined $val) || ($val="");
+  $key=~s/([^a-z0-9])/sprintf("%%%x",ord($1))/egsi;
   $key=~s/ /\+/go;
-  $key=~s/([^a-z0-9+])/sprintf("%%%x",ord($1))/egsi;
+  $val=~s/([^a-z0-9])/sprintf("%%%02x",ord($1))/egsi;
   $val=~s/ /\+/go;
-  $val=~s/([^a-z0-9+])/sprintf("%%%02x",ord($1))/egsi;
   return "$key=$val";
 }
 
@@ -3846,6 +3889,7 @@ sub EncVal($$) {
 ##
 sub DecVal($) {
   my ($val)=@_;
+  (defined $val) || ($val="");
   $val=~s/\+/ /go;
   $val=~s/%([0-9A-F]{2})/pack("C", hex($1))/egsi;
   return "$val";

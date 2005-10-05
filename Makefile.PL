@@ -63,6 +63,22 @@ pkg: rebuild-pkg version manifypods pure_all
 	build-pkg -n %PKG%-v%VERSION%.pkg -K
 	mv InstallPackage/*.pkg .
 
+##
+## Used for tagging the CVS tree with the current version
+##
+tag:
+	\@currtag=`cvs status -v Makefile.PL | grep '(revision: ' | head -1 | awk '{print \$\$1}'` ; \\
+	symtag="v\$(VERSION_SYM)" ; \\
+	if [ "\$\${currtag}" = "\$\${symtag}" ]; then \\
+	  echo "Tag already at \$\${symtag}"; \\
+	  exit 0; \\
+	fi ; \\
+	/usr/bin/echo "\\nWill tag to \$\${symtag}; are you sure? [Y/N] \\c" ; \\
+	read yesno ; \\
+	if [ "\$\${yesno}" != "Y" ]; then echo "Aborting" ; exit 255 ; fi ; \\
+	cvs update ; \\
+	cvs tag \$\${symtag}
+
 EOF
 }
 

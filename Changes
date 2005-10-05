@@ -1,5 +1,20 @@
 Revision history for Perl extension LJ::Simple.
 
+0.14  Wed Oct  5 17:52:45 BST 2005
+	- Added ability to cvs tag to Makefile.PL
+	- Changed certain uses of gmtime() to localtime() when dealing with
+		the retrival of entries and the like so that the expected
+		results are found.
+	- More sanity checking of the arguments passed to sub-routines
+	- Corrected the encoding of values so that the "+" character 
+		actually ends up as a "+" and not a space.
+	- examples/friends-only: Added some sanity checks to ensure that
+		entries which are blank do not get acted on.
+	- Fixed SetProtectPublic() so that it actually works; I'm pretty
+		sure that this used to work so I'm guessing that the LJ
+		flat protocol implementation has changed. Problem noted
+		by Igor Guryanov
+
 0.13  Fri Jul  8 10:35:04 BST 2005
 	- Documentation fix for GetEntries() to note that it will only every
 		return 50 items no matter what mode is used. Added pointer to
@@ -17,9 +32,9 @@ Revision history for Perl extension LJ::Simple.
 		object; correctly handles returning the right number of tests.
 		Problem noted by STEPANOV
 	- Added support for http_proxy and HTTP_PROXY environment variables
-		within the LJ::Simple object creation. The environment variables
-		on only looked at iff the http variable is *not* given during the
-		object creation.
+		within the LJ::Simple object creation. The environment
+		variables on only looked at iff the http variable is *not*
+		given during the object creation.
 		Problem noted by STEPANOV
 
 0.12.1  Wed Jan 12 21:13:35 GMT 2005
