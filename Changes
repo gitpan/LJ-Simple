@@ -1,5 +1,11 @@
 Revision history for Perl extension LJ::Simple.
 
+0.15  Fri Feb 24 23:40:57 GMT 2006
+	- Added tags support to QuickPost()
+	- Added ability to return of results of posting to QuickPost()
+	- Added the GetTags() method to return the list of existing tags
+		available for use
+
 0.14  Wed Oct  5 17:52:45 BST 2005
 	- Added ability to cvs tag to Makefile.PL
 	- Changed certain uses of gmtime() to localtime() when dealing with

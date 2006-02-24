@@ -15,7 +15,7 @@
 
 #########################
 use Test;
-BEGIN { plan tests => 38 };
+BEGIN { plan tests => 42 };
 use LJ::Simple;
 ok(1); # If we made it this far, we're ok.
 #########################
@@ -51,6 +51,23 @@ if (LJ::Simple::QuickPost(
                 protect => "groups",
 		groups => [],
     ) == 1) { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost(
+		user => $user, pass => $pass, entry => "foo",
+                tags => "groups",
+    ) == 0) { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost(
+		user => $user, pass => $pass, entry => "foo",
+                tags => [],
+    ) == 1) { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost(
+		user => $user, pass => $pass, entry => "foo",
+                results => "groups",
+    ) == 0) { ok(1) } else { ok(0) }
+if (LJ::Simple::QuickPost(
+		user => $user, pass => $pass, entry => "foo",
+                results => {},
+    ) == 1) { ok(1) } else { ok(0) }
+$LJ::Simple::TestStopQuickPost = 0;
 
 #goto LOGIN;
 
@@ -472,7 +489,7 @@ if ((defined $lj)&&($lj->AddToEntry(\%Event,@stuff))) {
   ok(0) 
 }
 
-JTEST:
+#JTEST:
 
 ## Now re-create an entry
 if ((defined $lj)&&($lj->NewEntry(\%Event))) {

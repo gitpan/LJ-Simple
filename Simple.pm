@@ -9,7 +9,7 @@ require AutoLoader;
 @ISA = qw(Exporter AutoLoader);
 @EXPORT_OK = qw();
 @EXPORT = qw();
-$VERSION = '0.14';
+$VERSION = '0.15';
 
 ## Bring in modules we use
 use strict;		# Silly not to be strict
@@ -360,6 +360,8 @@ There are a number of options to the C<LJ::Simple::QuickPost()> routine:
 	html	=>	HTML content ?
 	protect	=>	Security settings of the entry
 	groups	=>	Friends groups list
+	tags	=>	Tags list
+	results	=>	Hash to store results in
   );
 
 Of these, only the C<user>, C<pass> and C<entry> options are required; all of the other
@@ -421,6 +423,28 @@ If the C<protect> option is set to C<groups> then this option should contain a
 list reference which contains the list of groups the entry should be restricted to.
 This option is B<required> if the C<protect> option is set to C<groups>.
 
+=item tags
+
+Set tags for the entry; this should contain a list reference which contains the
+tags to be set.
+
+=item results
+
+The results of posting the entry should be returned; this should contain a
+hash reference. The hash given will be filled with the result of posting the
+article; the hash refered to B<will be emptied> by this.
+
+The keys in the hash point to:
+
+  ok      - Return code of QuickPost
+  item_id - Item_id as returned by the LiveJournal server
+  anum    - Anum as returned by the LiveJournal server
+  html_id - The item_id of the entry as used in HTML
+  url     - A URL which could be used to access the entry
+
+It should be noted that when C<QuickPost()> fails, C<ok> will point to
+a value of C<0> and all other entries in the hash will be C<undef>.
+
 =back
 
 Example code:
@@ -449,6 +473,17 @@ Example code:
 	protect	=>	"groups",
 	groups	=>	[qw( one_group another_group )],
     ) || die "$0: Failed to post entry: $LJ::Simple::error\n";
+
+  # Simple test post with tags and returning HTML
+  my %Results=();
+  LJ::Simple::QuickPost(
+	user	=>	"test",
+	pass	=>	"test",
+	entry	=>	"Just a simple entry",
+	tags	=>	[ "Just a test", "Testing" ],
+	results	=>	\%Results,
+    ) || die "$0: Failed to post entry: $LJ::Simple::error\n";
+  print "URL = $Results{url}\n";
 
 =cut
 sub QuickPost(@) {
@@ -480,6 +515,14 @@ sub QuickPost(@) {
     }
     @prot_opts=@{$opts{groups}};
   }
+  if ((exists $opts{tags}) && (ref($opts{tags}) ne "ARRAY")) {
+    $LJ::Simple::error="CODE: QuickPost() not given a list reference for the tags option";
+    return 0;
+  }
+  if ((exists $opts{results}) && (ref($opts{results}) ne "HASH")) {
+    $LJ::Simple::error="CODE: QuickPost() not given a hash reference for the results option";
+    return 0;
+  }
 
   # Kludge so we can test the input validation
   ($LJ::Simple::TestStopQuickPost) && return 1;
@@ -503,11 +546,25 @@ sub QuickPost(@) {
     ($lj->Setprop_preformatted(\%Event,$opts{html}) || return 0);
   (exists $opts{protect}) &&
     ($lj->SetProtect(\%Event,$opts{protect},@prot_opts) || return 0);
+  (exists $opts{tags}) &&
+    ($lj->Setprop_taglist(\%Event,@{$opts{tags}}) || return 0);
 
+  my $RetCode = 0;
   my ($item_id,$anum,$html_id)=$lj->PostEntry(\%Event);
-  (defined $item_id) || return 0;
-
-  return 1;
+  (defined $item_id) && ($RetCode=1);
+  if (exists $opts{results}) {
+    my $user=$lj->user();
+    my $server=$lj->{lj}->{host};
+    my $port=$lj->{lj}->{port};
+    %{$opts{results}}=(
+	ok	=>	$RetCode,
+	item_id	=>	$item_id,
+	anum	=>	$anum,
+	html_id	=>	$html_id,
+	url	=>	"http://$server:$port/users/$user/$html_id.html",
+    );
+  }
+  return $RetCode;
 }
 
 =pod
@@ -1323,6 +1380,70 @@ sub fastserver($) {
 
 =back
 
+=head2 Tags
+
+=over 4
+
+=item $lj->GetTags()
+
+Returns a list of the tags the user has defined. The list returned
+contains at least one entry, the number of entries in the list.
+This value can range from 0 to however
+many tags are in the list. In the event of a failure this value is
+undefined.
+
+The list of tags is a list of hash references which contain data
+about the tag; each hash referenced will contain the following:
+
+  {
+    name      => The name of the tag
+    uses      => Number of times has the tag been used in total
+    security  => Visibility of the tag; this can be "public", "private",
+                 "friends" or "group"
+    display   => If defined this indicates that the tag is visible to
+                 the S2 style system. If set to undef the tag is usable,
+                 just not exposed to S2
+  }
+
+The list of tags is returned ordered by the tag names.
+
+Example code:
+
+  # Print out the names of the tags
+  my ($count,@Tags)=$lj->GetTags();
+  (defined $count) || die "$0: Failed to get list of tags - $LJ::Simple::error\n";
+  print "Total tags: $count\n";
+  map { print "$_->{name}\n"; } (@Tags);
+
+=cut
+sub GetTags($) {
+  my $self=shift;
+  $LJ::Simple::error="";
+  my %Event=();
+  my %Resp=();
+  $self->SendRequest("getusertags",\%Event,\%Resp) || return undef;
+  my %Tags=();
+  while(my ($name,$val) = each %Resp) {
+    ($name=~/tag_([0-9]+)_(.*)/o) || next;
+    my ($id,$key)=($1,$2);
+    (exists $Tags{$id}) || ($Tags{$id}={});
+    $Tags{$id}->{$key}=$val;
+  }
+  my @Return=();
+  foreach my $tag_id (keys %Tags) {
+    push(@Return,{});
+    my $dest=$Return[$#Return];
+    my $src=$Tags{$tag_id};
+    map { $dest->{$_} = (exists $src->{$_})?$src->{$_}:undef } (qw( name uses security display ));
+  }
+  return(scalar(@Return),(sort {lc($a->{name}) cmp lc($b->{name})} @Return));
+}
+
+
+=pod
+
+=back
+
 =head2 Dealing with friends
 
 =over 4
@@ -1330,7 +1451,7 @@ sub fastserver($) {
 =item $lj->GetFriendOf()
 
 Returns a list of the other LiveJournal users who list the current
-user as a friend. The list returned contains a least one entry, the
+user as a friend. The list returned contains at least one entry, the
 number of entries in the list. This value can range from 0 to however
 many users are in the list. In the event of a failure this value is
 undefined.
@@ -4012,6 +4133,7 @@ sub SendRequest($$$$) {
          || ($mode eq "checkfriends") 
          || ($mode eq "getdaycounts") 
          || ($mode eq "getfriendgroups") 
+         || ($mode eq "getusertags") 
           ) {
     if (defined $args) {
       my ($k,$v);
